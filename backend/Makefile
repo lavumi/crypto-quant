@@ -1,7 +1,20 @@
-.PHONY: build clean test run-api run-collector run-backtest help
+.PHONY: build build-full build-frontend clean clean-frontend test run-api run-collector run-backtest help
 
-# Build all binaries
+# Build all binaries (without frontend)
 build: build-api build-collector build-backtest
+
+# Build everything including frontend (for production)
+build-full: build-frontend build
+
+# Build frontend and embed it
+build-frontend:
+	@echo "Building frontend..."
+	@cd ../frontend && pnpm build
+	@echo "Copying frontend to backend for embedding..."
+	@rm -rf internal/api/frontend/build
+	@mkdir -p internal/api/frontend/build
+	@cp -r ../frontend/build/* internal/api/frontend/build/
+	@echo "✓ Frontend ready for embedding"
 
 # Build individual binaries
 build-api:
@@ -21,6 +34,15 @@ clean:
 	@echo "Cleaning build artifacts..."
 	@rm -rf bin/
 	@mkdir -p bin/
+
+# Clean frontend build
+clean-frontend:
+	@echo "Cleaning frontend build..."
+	@rm -rf internal/api/frontend/build
+	@cd ../frontend && rm -rf build .svelte-kit
+
+# Clean everything
+clean-all: clean clean-frontend
 
 # Run tests
 test:
@@ -66,11 +88,15 @@ lint:
 # Show help
 help:
 	@echo "Available targets:"
-	@echo "  build           - Build all binaries"
+	@echo "  build           - Build all binaries (without frontend)"
+	@echo "  build-full      - Build everything including frontend (production)"
+	@echo "  build-frontend  - Build frontend and prepare for embedding"
 	@echo "  build-api       - Build API server"
 	@echo "  build-collector - Build data collector"
 	@echo "  build-backtest  - Build backtesting engine"
 	@echo "  clean           - Remove build artifacts"
+	@echo "  clean-frontend  - Remove frontend build"
+	@echo "  clean-all       - Remove all build artifacts"
 	@echo "  test            - Run tests"
 	@echo "  run-api         - Run API server"
 	@echo "  run-collector   - Run data collector"

@@ -1,7 +1,10 @@
 package api
 
 import (
+	"io/fs"
 	"log"
+	"net/http"
+	"path/filepath"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -40,6 +43,17 @@ func SetupRouter(
 
 	// Swagger documentation
 	router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
+
+	// Serve embedded frontend static files
+	frontendFS, err := GetFrontendFS()
+	if err != nil {
+		log.Printf("Warning: Failed to load embedded frontend: %v", err)
+	} else {
+		// Serve static files (CSS, JS, images, etc.)
+		router.Use(serveStaticFiles(frontendFS))
+		// SPA fallback - serve index.html for all non-API routes
+		router.NoRoute(serveSPAFallback(frontendFS))
+	}
 
 	// API v1 routes
 	v1 := router.Group("/api/v1")
@@ -107,6 +121,11 @@ func LoggerMiddleware() gin.HandlerFunc {
 		// Process request
 		c.Next()
 
+		// Skip logging for static files and frontend assets
+		if shouldSkipLogging(path) {
+			return
+		}
+
 		// Log after request
 		latency := time.Since(start)
 		statusCode := c.Writer.Status()
@@ -127,6 +146,28 @@ func LoggerMiddleware() gin.HandlerFunc {
 	}
 }
 
+// shouldSkipLogging determines if a request should be skipped from logging
+func shouldSkipLogging(path string) bool {
+	// Skip frontend static assets
+	if len(path) >= 5 && path[:5] == "/_app" {
+		return true
+	}
+	// Skip common static files
+	switch path {
+	case "/favicon.ico", "/robots.txt", "/":
+		return true
+	}
+	// Skip static file extensions
+	if len(path) > 4 {
+		ext := path[len(path)-4:]
+		switch ext {
+		case ".js", ".css", ".svg", ".png", ".jpg", "jpeg", ".gif", ".ico", "woff", "ttf", "eot", ".map", "json":
+			return true
+		}
+	}
+	return false
+}
+
 // CORSMiddleware handles Cross-Origin Resource Sharing
 func CORSMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
@@ -141,5 +182,47 @@ func CORSMiddleware() gin.HandlerFunc {
 		}
 
 		c.Next()
+	}
+}
+
+// serveStaticFiles serves static files from the embedded filesystem
+func serveStaticFiles(frontendFS fs.FS) gin.HandlerFunc {
+	fileServer := http.FileServer(http.FS(frontendFS))
+
+	return func(c *gin.Context) {
+		path := c.Request.URL.Path
+
+		// Skip API routes, health check, and swagger
+		if len(path) >= 4 && path[:4] == "/api" {
+			c.Next()
+			return
+		}
+		if path == "/health" || len(path) >= 8 && path[:8] == "/swagger" {
+			c.Next()
+			return
+		}
+
+		// Check if file exists in embedded FS
+		if _, err := fs.Stat(frontendFS, filepath.Clean(path[1:])); err == nil {
+			fileServer.ServeHTTP(c.Writer, c.Request)
+			c.Abort()
+			return
+		}
+
+		c.Next()
+	}
+}
+
+// serveSPAFallback serves index.html for all unmatched routes (SPA routing)
+func serveSPAFallback(frontendFS fs.FS) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		// Read index.html from embedded FS
+		indexHTML, err := fs.ReadFile(frontendFS, "index.html")
+		if err != nil {
+			c.String(http.StatusNotFound, "Frontend not available")
+			return
+		}
+
+		c.Data(http.StatusOK, "text/html; charset=utf-8", indexHTML)
 	}
 }
