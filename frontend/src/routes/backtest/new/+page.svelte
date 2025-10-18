@@ -15,7 +15,7 @@
 	let positionSize = $state(0.01);
 
 	// Strategy selection
-	type Strategy = 'ma_cross' | 'rsi' | 'bb_rsi';
+	type Strategy = 'ma_cross' | 'rsi' | 'bb_rsi' | 'dca';
 	let selectedStrategy = $state<Strategy>('ma_cross');
 
 	// Strategy parameters
@@ -26,6 +26,8 @@
 	let rsiOverbought = $state(70);
 	let bbPeriod = $state(20);
 	let bbStdDev = $state(2);
+	let dcaPeriod = $state('24h');
+	let dcaAmountUSDT = $state(100);
 
 	let isLoading = $state(false);
 	let error = $state('');
@@ -133,6 +135,9 @@
 				requestBody.rsi_period = rsiPeriod;
 				requestBody.rsi_oversold = rsiOversold;
 				requestBody.rsi_overbought = rsiOverbought;
+			} else if (selectedStrategy === 'dca') {
+				requestBody.dca_period = dcaPeriod;
+				requestBody.dca_amount_usdt = dcaAmountUSDT;
 			}
 
 			console.log('🚀 백테스트 요청:', requestBody);
@@ -355,6 +360,19 @@
 							볼린저밴드와 RSI를 조합한 복합 전략
 						</p>
 					</button>
+
+					<button
+						class="w-full text-left p-4 rounded-lg border-2 transition-all {selectedStrategy ===
+						'dca'
+							? 'border-primary bg-primary/5'
+							: 'border-border hover:border-primary/50'}"
+						onclick={() => (selectedStrategy = 'dca')}
+					>
+						<div class="font-semibold">적립식 투자 (DCA)</div>
+						<p class="text-sm text-muted-foreground mt-1">
+							일정 기간마다 고정 금액을 자동 매수
+						</p>
+					</button>
 				</div>
 			</Card>
 		</div>
@@ -514,6 +532,50 @@
 							<p class="text-sm">
 								가격이 볼린저밴드 하단에 접근하고 RSI가 과매도 상태이면 매수,<br />
 								상단에 접근하고 RSI가 과매수 상태이면 매도
+							</p>
+						</div>
+					</div>
+				{:else if selectedStrategy === 'dca'}
+					<div class="space-y-4">
+						<div>
+							<Label for="dcaPeriod">구매 주기</Label>
+							<select
+								id="dcaPeriod"
+								bind:value={dcaPeriod}
+								class="w-full px-3 py-2 border border-input rounded-md bg-background mt-1.5"
+							>
+								<option value="1h">1시간마다</option>
+								<option value="4h">4시간마다</option>
+								<option value="12h">12시간마다</option>
+								<option value="24h">1일마다</option>
+								<option value="168h">7일마다 (주간)</option>
+								<option value="720h">30일마다 (월간)</option>
+							</select>
+							<p class="text-xs text-muted-foreground mt-1">매수를 실행할 시간 간격</p>
+						</div>
+
+						<div>
+							<Label for="dcaAmountUSDT">구매 금액 (USDT)</Label>
+							<Input
+								id="dcaAmountUSDT"
+								type="number"
+								bind:value={dcaAmountUSDT}
+								min="1"
+								step="10"
+								class="mt-1.5"
+							/>
+							<p class="text-xs text-muted-foreground mt-1">
+								매번 구매할 고정 금액 (USDT 기준)
+							</p>
+						</div>
+
+						<div class="bg-muted/50 p-4 rounded-lg">
+							<p class="text-sm">
+								<strong>적립식 투자 (DCA)</strong><br />
+								시장 상황과 무관하게 {dcaPeriod === '1h' ? '1시간' : dcaPeriod === '4h' ? '4시간' : dcaPeriod === '12h' ? '12시간' : dcaPeriod === '24h' ? '매일' : dcaPeriod === '168h' ? '매주' : '매달'}마다 {dcaAmountUSDT} USDT를 자동으로 매수합니다.<br />
+								<small class="text-muted-foreground">
+									※ 가격 변동성을 분산시켜 평균 매수가를 낮추는 전략
+								</small>
 							</p>
 						</div>
 					</div>

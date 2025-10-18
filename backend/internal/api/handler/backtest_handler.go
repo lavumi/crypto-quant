@@ -44,6 +44,10 @@ type BacktestRequest struct {
 	RSIOversold   float64 `json:"rsi_oversold" example:"30"`
 	RSIOverbought float64 `json:"rsi_overbought" example:"70"`
 
+	// Strategy parameters (DCA - Dollar Cost Averaging)
+	DCAPeriod     string  `json:"dca_period" example:"24h"`
+	DCAAmountUSDT float64 `json:"dca_amount_usdt" example:"100"`
+
 	// Position size
 	PositionSize float64 `json:"position_size" example:"0.01"`
 }
@@ -257,8 +261,27 @@ func (h *BacktestHandler) RunBacktest(c *gin.Context) {
 		}
 		strat = strategy.NewBBRSIStrategy(bbPeriod, bbMultiplier, rsiPeriod, rsiOversold, rsiOverbought, req.PositionSize)
 
+	case "dca":
+		// Parse period string to duration
+		periodStr := req.DCAPeriod
+		if periodStr == "" {
+			periodStr = "24h" // Default to daily
+		}
+		period, err := time.ParseDuration(periodStr)
+		if err != nil {
+			response.Error(c, http.StatusBadRequest, "Invalid dca_period format. Use duration format like '24h', '7d', '1h'")
+			return
+		}
+
+		amountUSDT := req.DCAAmountUSDT
+		if amountUSDT == 0 {
+			amountUSDT = 100 // Default $100 per purchase
+		}
+
+		strat = strategy.NewDCAStrategy(period, amountUSDT)
+
 	default:
-		response.Error(c, http.StatusBadRequest, "Unknown strategy: "+req.Strategy+". Available: ma_cross, rsi, bb_rsi")
+		response.Error(c, http.StatusBadRequest, "Unknown strategy: "+req.Strategy+". Available: ma_cross, rsi, bb_rsi, dca")
 		return
 	}
 
@@ -412,6 +435,23 @@ func (h *BacktestHandler) GetStrategies(c *gin.Context) {
 					"type":        "float",
 					"default":     0.01,
 					"description": "Position size per trade",
+				},
+			},
+		},
+		"dca": map[string]interface{}{
+			"name":        "Dollar Cost Averaging",
+			"description": "Buys a fixed USDT amount at regular intervals regardless of price",
+			"parameters": map[string]interface{}{
+				"dca_period": map[string]interface{}{
+					"type":        "string",
+					"default":     "24h",
+					"description": "Purchase interval (e.g., '1h', '24h', '7d')",
+					"examples":    []string{"1h", "24h", "7d", "168h"},
+				},
+				"dca_amount_usdt": map[string]interface{}{
+					"type":        "float",
+					"default":     100,
+					"description": "Amount in USDT to purchase each interval",
 				},
 			},
 		},
