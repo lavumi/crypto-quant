@@ -32,14 +32,24 @@ func (c *Collector) CollectHistorical(ctx context.Context, symbol, interval stri
 
 	// Binance allows max 1000 candles per request
 	const maxLimit = 1000
+	const maxRetries = 3
+	const baseDelay = 250 * time.Millisecond // More conservative rate limiting
 
 	currentStart := startTime
 	totalCandles := 0
+	batchCount := 0
+
+	// Calculate estimated total batches for progress tracking
+	intervalDuration := parseInterval(interval)
+	totalDuration := endTime.Sub(startTime)
+	estimatedBatches := int(totalDuration / (intervalDuration * maxLimit))
+	if estimatedBatches == 0 {
+		estimatedBatches = 1
+	}
 
 	for currentStart.Before(endTime) {
 		// Calculate end time for this batch
 		var limit int
-		intervalDuration := parseInterval(interval)
 		batchEnd := currentStart.Add(intervalDuration * maxLimit)
 		if batchEnd.After(endTime) {
 			batchEnd = endTime
@@ -57,20 +67,39 @@ func (c *Collector) CollectHistorical(ctx context.Context, symbol, interval stri
 			limit = maxLimit
 		}
 
-		// Fetch klines from Binance
-		klines, err := c.client.NewKlinesService().
-			Symbol(symbol).
-			Interval(interval).
-			StartTime(currentStart.UnixMilli()).
-			EndTime(batchEnd.UnixMilli()).
-			Limit(limit).
-			Do(ctx)
+		// Fetch klines with retry logic
+		var klines []*binance.Kline
+		var err error
 
-		if err != nil {
-			return fmt.Errorf("failed to fetch klines: %w", err)
+		for retry := 0; retry <= maxRetries; retry++ {
+			klines, err = c.client.NewKlinesService().
+				Symbol(symbol).
+				Interval(interval).
+				StartTime(currentStart.UnixMilli()).
+				EndTime(batchEnd.UnixMilli()).
+				Limit(limit).
+				Do(ctx)
+
+			if err == nil {
+				break // Success
+			}
+
+			// Check if it's a rate limit error (429) or other retryable error
+			if retry < maxRetries {
+				// Exponential backoff: 1s, 2s, 4s
+				backoffDelay := time.Duration(1<<uint(retry)) * time.Second
+				log.Printf("API error (attempt %d/%d): %v. Retrying after %v...",
+					retry+1, maxRetries, err, backoffDelay)
+				time.Sleep(backoffDelay)
+				continue
+			}
+
+			// Max retries exceeded
+			return fmt.Errorf("failed to fetch klines after %d retries: %w", maxRetries, err)
 		}
 
 		if len(klines) == 0 {
+			log.Printf("No more data available. Stopping collection.")
 			break
 		}
 
@@ -102,7 +131,15 @@ func (c *Collector) CollectHistorical(ctx context.Context, symbol, interval stri
 		}
 
 		totalCandles += len(candles)
-		log.Printf("Saved %d candles (total: %d)", len(candles), totalCandles)
+		batchCount++
+
+		// Progress indicator
+		progress := float64(batchCount) / float64(estimatedBatches) * 100
+		if progress > 100 {
+			progress = 100
+		}
+		log.Printf("Progress: %.1f%% | Batch %d: saved %d candles (total: %d)",
+			progress, batchCount, len(candles), totalCandles)
 
 		// Move to next batch
 		if len(klines) > 0 {
@@ -112,11 +149,14 @@ func (c *Collector) CollectHistorical(ctx context.Context, symbol, interval stri
 			break
 		}
 
-		// Rate limiting - be nice to Binance API
-		time.Sleep(100 * time.Millisecond)
+		// Rate limiting - be conservative to avoid 429 errors
+		// Binance limit: 1200 weight/min, klines = 1-2 weight
+		// 250ms = max ~4 req/sec = ~240 req/min (safe margin)
+		time.Sleep(baseDelay)
 	}
 
-	log.Printf("Historical data collection complete: %d total candles collected for %s", totalCandles, symbol)
+	log.Printf("✅ Historical data collection complete: %d total candles collected for %s in %d batches",
+		totalCandles, symbol, batchCount)
 	return nil
 }
 
