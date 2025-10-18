@@ -1,0 +1,828 @@
+{
+    "swagger": "2.0",
+    "info": {
+        "description": "Cryptocurrency quantitative trading API server",
+        "title": "Crypto Quant API",
+        "termsOfService": "http://swagger.io/terms/",
+        "contact": {
+            "name": "API Support",
+            "url": "http://www.swagger.io/support",
+            "email": "support@swagger.io"
+        },
+        "license": {
+            "name": "MIT",
+            "url": "https://opensource.org/licenses/MIT"
+        },
+        "version": "1.0"
+    },
+    "host": "localhost:8080",
+    "basePath": "/api/v1",
+    "paths": {
+        "/backtest/run": {
+            "post": {
+                "description": "Execute a backtest with specified parameters and strategy",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "backtest"
+                ],
+                "summary": "Run a backtest",
+                "parameters": [
+                    {
+                        "description": "Backtest parameters",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handler.BacktestRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handler.BacktestResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/backtest/strategies": {
+            "get": {
+                "description": "Get list of available backtest strategies and their parameters",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "backtest"
+                ],
+                "summary": "Get available strategies",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/data/candles": {
+            "get": {
+                "description": "Get historical candle data within a time range",
+                "tags": [
+                    "data"
+                ],
+                "summary": "Get candles",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Trading symbol (e.g., BTCUSDT)",
+                        "name": "symbol",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Candle interval (e.g., 1h, 1d)",
+                        "name": "interval",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Start time (RFC3339 format)",
+                        "name": "start",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "End time (RFC3339 format)",
+                        "name": "end",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/data/candles/latest": {
+            "get": {
+                "description": "Get the most recent candle for a symbol",
+                "tags": [
+                    "data"
+                ],
+                "summary": "Get latest candle",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Trading symbol (e.g., BTCUSDT)",
+                        "name": "symbol",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Candle interval (e.g., 1h, 1d)",
+                        "name": "interval",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/data/collect": {
+            "post": {
+                "description": "Collect historical candle data from Binance",
+                "tags": [
+                    "data"
+                ],
+                "summary": "Collect historical data",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Trading symbol (e.g., BTCUSDT)",
+                        "name": "symbol",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Candle interval (e.g., 1h, 1d)",
+                        "name": "interval",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Number of days to collect (default: 30)",
+                        "name": "days",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/data/trades": {
+            "get": {
+                "description": "Get all trades for a symbol",
+                "tags": [
+                    "data"
+                ],
+                "summary": "Get trade history",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Trading symbol (e.g., BTCUSDT)",
+                        "name": "symbol",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/data/validate": {
+            "get": {
+                "description": "Check if historical data is available for the requested period",
+                "tags": [
+                    "data"
+                ],
+                "summary": "Validate data availability",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Trading symbol (e.g., BTCUSDT)",
+                        "name": "symbol",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Candle interval (e.g., 1h, 1d)",
+                        "name": "interval",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Start date (YYYY-MM-DD)",
+                        "name": "start",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "End date (YYYY-MM-DD)",
+                        "name": "end",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/market/price/{symbol}": {
+            "get": {
+                "description": "Get the current price for a symbol",
+                "tags": [
+                    "market"
+                ],
+                "summary": "Get current price",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Trading symbol (e.g., BTCUSDT)",
+                        "name": "symbol",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/market/prices": {
+            "get": {
+                "description": "Get current prices for multiple symbols",
+                "tags": [
+                    "market"
+                ],
+                "summary": "Get multiple prices",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Comma-separated symbols (e.g., BTCUSDT,ETHUSDT)",
+                        "name": "symbols",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/market/stream/{symbol}": {
+            "get": {
+                "description": "Stream real-time price updates via Server-Sent Events",
+                "tags": [
+                    "market"
+                ],
+                "summary": "Stream real-time price (SSE)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Trading symbol (e.g., BTCUSDT)",
+                        "name": "symbol",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Update interval in seconds (default: 1)",
+                        "name": "interval",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "text/event-stream",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/orders": {
+            "post": {
+                "description": "Place a new trading order",
+                "consumes": [
+                    "application/json"
+                ],
+                "tags": [
+                    "orders"
+                ],
+                "summary": "Place order",
+                "parameters": [
+                    {
+                        "description": "Order details",
+                        "name": "order",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handler.PlaceOrderRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/orders/{orderId}": {
+            "get": {
+                "description": "Get order details by ID",
+                "tags": [
+                    "orders"
+                ],
+                "summary": "Get order",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Order ID",
+                        "name": "orderId",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "description": "Cancel an existing order",
+                "tags": [
+                    "orders"
+                ],
+                "summary": "Cancel order",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Order ID",
+                        "name": "orderId",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/portfolio/pnl": {
+            "get": {
+                "description": "Get total profit/loss across all positions",
+                "tags": [
+                    "portfolio"
+                ],
+                "summary": "Get total PnL",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/portfolio/pnl/{symbol}": {
+            "get": {
+                "description": "Calculate profit/loss for a symbol",
+                "tags": [
+                    "portfolio"
+                ],
+                "summary": "Get PnL",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Trading symbol (e.g., BTCUSDT)",
+                        "name": "symbol",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/portfolio/position/{symbol}": {
+            "get": {
+                "description": "Get position for a specific symbol",
+                "tags": [
+                    "portfolio"
+                ],
+                "summary": "Get position",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Trading symbol (e.g., BTCUSDT)",
+                        "name": "symbol",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/portfolio/positions": {
+            "get": {
+                "description": "Get all portfolio positions",
+                "tags": [
+                    "portfolio"
+                ],
+                "summary": "Get all positions",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/wallet/balance/{asset}": {
+            "get": {
+                "description": "Get balance for a specific asset",
+                "tags": [
+                    "wallet"
+                ],
+                "summary": "Get balance",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Asset symbol (e.g., USDT, BTC)",
+                        "name": "asset",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/wallet/balances": {
+            "get": {
+                "description": "Get all wallet balances",
+                "tags": [
+                    "wallet"
+                ],
+                "summary": "Get all balances",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "definitions": {
+        "handler.BacktestRequest": {
+            "type": "object",
+            "required": [
+                "end_date",
+                "interval",
+                "start_date",
+                "symbol"
+            ],
+            "properties": {
+                "commission": {
+                    "type": "number",
+                    "example": 0.001
+                },
+                "end_date": {
+                    "type": "string",
+                    "example": "2025-10-17"
+                },
+                "fast_period": {
+                    "description": "Strategy parameters (MA Cross)",
+                    "type": "integer",
+                    "example": 10
+                },
+                "initial_balance": {
+                    "type": "number",
+                    "example": 10000
+                },
+                "interval": {
+                    "type": "string",
+                    "example": "1h"
+                },
+                "position_size": {
+                    "description": "Position size",
+                    "type": "number",
+                    "example": 0.01
+                },
+                "rsi_overbought": {
+                    "type": "number",
+                    "example": 70
+                },
+                "rsi_oversold": {
+                    "type": "number",
+                    "example": 30
+                },
+                "rsi_period": {
+                    "description": "Strategy parameters (RSI)",
+                    "type": "integer",
+                    "example": 14
+                },
+                "slow_period": {
+                    "type": "integer",
+                    "example": 30
+                },
+                "start_date": {
+                    "type": "string",
+                    "example": "2025-07-01"
+                },
+                "strategy": {
+                    "type": "string",
+                    "example": "ma_cross"
+                },
+                "symbol": {
+                    "type": "string",
+                    "example": "BTCUSDT"
+                }
+            }
+        },
+        "handler.BacktestResponse": {
+            "type": "object",
+            "properties": {
+                "candles_used": {
+                    "type": "integer",
+                    "example": 2152
+                },
+                "commission": {
+                    "type": "number",
+                    "example": 0.001
+                },
+                "duration": {
+                    "type": "string",
+                    "example": "2151h0m0s"
+                },
+                "end_time": {
+                    "type": "string",
+                    "example": "2025-10-17T08:00:00Z"
+                },
+                "final_equity": {
+                    "type": "number",
+                    "example": 9866.65
+                },
+                "initial_balance": {
+                    "description": "Financial metrics",
+                    "type": "number",
+                    "example": 10000
+                },
+                "interval": {
+                    "type": "string",
+                    "example": "1h"
+                },
+                "losing_trades": {
+                    "type": "integer",
+                    "example": 29
+                },
+                "max_drawdown": {
+                    "type": "number",
+                    "example": 206.59
+                },
+                "max_drawdown_pct": {
+                    "type": "number",
+                    "example": 2.07
+                },
+                "recent_trades": {
+                    "description": "Trade details (optional, limited to first 20)",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/handler.TradeDetail"
+                    }
+                },
+                "sharpe_ratio": {
+                    "description": "Risk metrics",
+                    "type": "number",
+                    "example": -2.16
+                },
+                "start_time": {
+                    "description": "Time metrics",
+                    "type": "string",
+                    "example": "2025-07-19T17:00:00Z"
+                },
+                "strategy": {
+                    "description": "Configuration",
+                    "type": "string",
+                    "example": "MA_Cross_10_30"
+                },
+                "symbol": {
+                    "type": "string",
+                    "example": "BTCUSDT"
+                },
+                "total_return": {
+                    "type": "number",
+                    "example": -1.33
+                },
+                "total_return_pct": {
+                    "type": "string",
+                    "example": "-1.33%"
+                },
+                "total_trades": {
+                    "description": "Trade statistics",
+                    "type": "integer",
+                    "example": 82
+                },
+                "win_rate": {
+                    "type": "number",
+                    "example": 29.27
+                },
+                "win_rate_pct": {
+                    "type": "string",
+                    "example": "29.27%"
+                },
+                "winning_trades": {
+                    "type": "integer",
+                    "example": 12
+                }
+            }
+        },
+        "handler.PlaceOrderRequest": {
+            "type": "object",
+            "required": [
+                "quantity",
+                "side",
+                "symbol",
+                "type"
+            ],
+            "properties": {
+                "price": {
+                    "type": "number"
+                },
+                "quantity": {
+                    "type": "number"
+                },
+                "side": {
+                    "type": "string"
+                },
+                "symbol": {
+                    "type": "string"
+                },
+                "type": {
+                    "type": "string"
+                }
+            }
+        },
+        "handler.TradeDetail": {
+            "type": "object",
+            "properties": {
+                "balance": {
+                    "type": "number",
+                    "example": 9328.59
+                },
+                "fee": {
+                    "type": "number",
+                    "example": 1.19
+                },
+                "position": {
+                    "type": "number",
+                    "example": 0.01
+                },
+                "price": {
+                    "type": "number",
+                    "example": 119362.67
+                },
+                "quantity": {
+                    "type": "number",
+                    "example": 0.01
+                },
+                "reason": {
+                    "type": "string",
+                    "example": "Golden Cross: Fast MA (118128.46) \u003e Slow MA (118117.20)"
+                },
+                "side": {
+                    "type": "string",
+                    "example": "BUY"
+                },
+                "timestamp": {
+                    "type": "string",
+                    "example": "2025-07-21T16:00:00Z"
+                }
+            }
+        },
+        "response.ErrorInfo": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string"
+                },
+                "message": {
+                    "type": "string"
+                }
+            }
+        },
+        "response.Response": {
+            "type": "object",
+            "properties": {
+                "data": {},
+                "error": {
+                    "$ref": "#/definitions/response.ErrorInfo"
+                },
+                "success": {
+                    "type": "boolean"
+                }
+            }
+        }
+    }
+}

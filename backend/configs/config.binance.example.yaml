@@ -1,0 +1,27 @@
+# Binance Exchange Configuration Example
+# Copy this file to config.binance.yaml and fill in your API credentials
+# IMPORTANT: Never commit config.binance.yaml to git!
+
+exchange:
+  type: binance
+  binance:
+    # Get your API keys from https://www.binance.com/en/my/settings/api-management
+    # Or use environment variables: BINANCE_API_KEY and BINANCE_SECRET_KEY
+    api_key: "YOUR_API_KEY_HERE"
+    secret_key: "YOUR_SECRET_KEY_HERE"
+    # Set to true to use testnet (recommended for testing)
+    # Testnet: https://testnet.binance.vision/
+    use_testnet: true
+
+portfolio:
+  # Initial balances are not used with real Binance
+  # The system will fetch your actual balances from the exchange
+  initial_balances: {
+    USDT: 10000.0
+  }
+
+trading:
+  symbols:
+    - BTCUSDT
+    - ETHUSDT
+  update_interval_sec: 5

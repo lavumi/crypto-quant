@@ -1,0 +1,22 @@
+exchange:
+  type: binance
+  binance:
+    # For public data (price queries), API keys are not required
+    # Only needed for private operations (trading, balance checks)
+    api_key: ""
+    secret_key: ""
+    # Use real Binance for live prices
+    use_testnet: false
+
+portfolio:
+  initial_balances:
+    USDT: 10000.0
+
+trading:
+  symbols:
+    - BTCUSDT
+    - ETHUSDT
+    - SOLUSDT
+    - BNBUSDT
+    - AVAXUSDT
+  update_interval_sec: 5

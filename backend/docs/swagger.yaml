@@ -1,0 +1,567 @@
+basePath: /api/v1
+definitions:
+  handler.BacktestRequest:
+    properties:
+      commission:
+        example: 0.001
+        type: number
+      end_date:
+        example: "2025-10-17"
+        type: string
+      fast_period:
+        description: Strategy parameters (MA Cross)
+        example: 10
+        type: integer
+      initial_balance:
+        example: 10000
+        type: number
+      interval:
+        example: 1h
+        type: string
+      position_size:
+        description: Position size
+        example: 0.01
+        type: number
+      rsi_overbought:
+        example: 70
+        type: number
+      rsi_oversold:
+        example: 30
+        type: number
+      rsi_period:
+        description: Strategy parameters (RSI)
+        example: 14
+        type: integer
+      slow_period:
+        example: 30
+        type: integer
+      start_date:
+        example: "2025-07-01"
+        type: string
+      strategy:
+        example: ma_cross
+        type: string
+      symbol:
+        example: BTCUSDT
+        type: string
+    required:
+    - end_date
+    - interval
+    - start_date
+    - symbol
+    type: object
+  handler.BacktestResponse:
+    properties:
+      candles_used:
+        example: 2152
+        type: integer
+      commission:
+        example: 0.001
+        type: number
+      duration:
+        example: 2151h0m0s
+        type: string
+      end_time:
+        example: "2025-10-17T08:00:00Z"
+        type: string
+      final_equity:
+        example: 9866.65
+        type: number
+      initial_balance:
+        description: Financial metrics
+        example: 10000
+        type: number
+      interval:
+        example: 1h
+        type: string
+      losing_trades:
+        example: 29
+        type: integer
+      max_drawdown:
+        example: 206.59
+        type: number
+      max_drawdown_pct:
+        example: 2.07
+        type: number
+      recent_trades:
+        description: Trade details (optional, limited to first 20)
+        items:
+          $ref: '#/definitions/handler.TradeDetail'
+        type: array
+      sharpe_ratio:
+        description: Risk metrics
+        example: -2.16
+        type: number
+      start_time:
+        description: Time metrics
+        example: "2025-07-19T17:00:00Z"
+        type: string
+      strategy:
+        description: Configuration
+        example: MA_Cross_10_30
+        type: string
+      symbol:
+        example: BTCUSDT
+        type: string
+      total_return:
+        example: -1.33
+        type: number
+      total_return_pct:
+        example: -1.33%
+        type: string
+      total_trades:
+        description: Trade statistics
+        example: 82
+        type: integer
+      win_rate:
+        example: 29.27
+        type: number
+      win_rate_pct:
+        example: 29.27%
+        type: string
+      winning_trades:
+        example: 12
+        type: integer
+    type: object
+  handler.PlaceOrderRequest:
+    properties:
+      price:
+        type: number
+      quantity:
+        type: number
+      side:
+        type: string
+      symbol:
+        type: string
+      type:
+        type: string
+    required:
+    - quantity
+    - side
+    - symbol
+    - type
+    type: object
+  handler.TradeDetail:
+    properties:
+      balance:
+        example: 9328.59
+        type: number
+      fee:
+        example: 1.19
+        type: number
+      position:
+        example: 0.01
+        type: number
+      price:
+        example: 119362.67
+        type: number
+      quantity:
+        example: 0.01
+        type: number
+      reason:
+        example: 'Golden Cross: Fast MA (118128.46) > Slow MA (118117.20)'
+        type: string
+      side:
+        example: BUY
+        type: string
+      timestamp:
+        example: "2025-07-21T16:00:00Z"
+        type: string
+    type: object
+  response.ErrorInfo:
+    properties:
+      code:
+        type: string
+      message:
+        type: string
+    type: object
+  response.Response:
+    properties:
+      data: {}
+      error:
+        $ref: '#/definitions/response.ErrorInfo'
+      success:
+        type: boolean
+    type: object
+host: localhost:8080
+info:
+  contact:
+    email: support@swagger.io
+    name: API Support
+    url: http://www.swagger.io/support
+  description: Cryptocurrency quantitative trading API server
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+  termsOfService: http://swagger.io/terms/
+  title: Crypto Quant API
+  version: "1.0"
+paths:
+  /backtest/run:
+    post:
+      consumes:
+      - application/json
+      description: Execute a backtest with specified parameters and strategy
+      parameters:
+      - description: Backtest parameters
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handler.BacktestRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.BacktestResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Run a backtest
+      tags:
+      - backtest
+  /backtest/strategies:
+    get:
+      description: Get list of available backtest strategies and their parameters
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Get available strategies
+      tags:
+      - backtest
+  /data/candles:
+    get:
+      description: Get historical candle data within a time range
+      parameters:
+      - description: Trading symbol (e.g., BTCUSDT)
+        in: query
+        name: symbol
+        required: true
+        type: string
+      - description: Candle interval (e.g., 1h, 1d)
+        in: query
+        name: interval
+        required: true
+        type: string
+      - description: Start time (RFC3339 format)
+        in: query
+        name: start
+        required: true
+        type: string
+      - description: End time (RFC3339 format)
+        in: query
+        name: end
+        required: true
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: Get candles
+      tags:
+      - data
+  /data/candles/latest:
+    get:
+      description: Get the most recent candle for a symbol
+      parameters:
+      - description: Trading symbol (e.g., BTCUSDT)
+        in: query
+        name: symbol
+        required: true
+        type: string
+      - description: Candle interval (e.g., 1h, 1d)
+        in: query
+        name: interval
+        required: true
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: Get latest candle
+      tags:
+      - data
+  /data/collect:
+    post:
+      description: Collect historical candle data from Binance
+      parameters:
+      - description: Trading symbol (e.g., BTCUSDT)
+        in: query
+        name: symbol
+        required: true
+        type: string
+      - description: Candle interval (e.g., 1h, 1d)
+        in: query
+        name: interval
+        required: true
+        type: string
+      - description: 'Number of days to collect (default: 30)'
+        in: query
+        name: days
+        type: integer
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: Collect historical data
+      tags:
+      - data
+  /data/trades:
+    get:
+      description: Get all trades for a symbol
+      parameters:
+      - description: Trading symbol (e.g., BTCUSDT)
+        in: query
+        name: symbol
+        required: true
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: Get trade history
+      tags:
+      - data
+  /data/validate:
+    get:
+      description: Check if historical data is available for the requested period
+      parameters:
+      - description: Trading symbol (e.g., BTCUSDT)
+        in: query
+        name: symbol
+        required: true
+        type: string
+      - description: Candle interval (e.g., 1h, 1d)
+        in: query
+        name: interval
+        required: true
+        type: string
+      - description: Start date (YYYY-MM-DD)
+        in: query
+        name: start
+        required: true
+        type: string
+      - description: End date (YYYY-MM-DD)
+        in: query
+        name: end
+        required: true
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: Validate data availability
+      tags:
+      - data
+  /market/price/{symbol}:
+    get:
+      description: Get the current price for a symbol
+      parameters:
+      - description: Trading symbol (e.g., BTCUSDT)
+        in: path
+        name: symbol
+        required: true
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: Get current price
+      tags:
+      - market
+  /market/prices:
+    get:
+      description: Get current prices for multiple symbols
+      parameters:
+      - description: Comma-separated symbols (e.g., BTCUSDT,ETHUSDT)
+        in: query
+        name: symbols
+        required: true
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: Get multiple prices
+      tags:
+      - market
+  /market/stream/{symbol}:
+    get:
+      description: Stream real-time price updates via Server-Sent Events
+      parameters:
+      - description: Trading symbol (e.g., BTCUSDT)
+        in: path
+        name: symbol
+        required: true
+        type: string
+      - description: 'Update interval in seconds (default: 1)'
+        in: query
+        name: interval
+        type: integer
+      responses:
+        "200":
+          description: text/event-stream
+          schema:
+            type: string
+      summary: Stream real-time price (SSE)
+      tags:
+      - market
+  /orders:
+    post:
+      consumes:
+      - application/json
+      description: Place a new trading order
+      parameters:
+      - description: Order details
+        in: body
+        name: order
+        required: true
+        schema:
+          $ref: '#/definitions/handler.PlaceOrderRequest'
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: Place order
+      tags:
+      - orders
+  /orders/{orderId}:
+    delete:
+      description: Cancel an existing order
+      parameters:
+      - description: Order ID
+        in: path
+        name: orderId
+        required: true
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: Cancel order
+      tags:
+      - orders
+    get:
+      description: Get order details by ID
+      parameters:
+      - description: Order ID
+        in: path
+        name: orderId
+        required: true
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: Get order
+      tags:
+      - orders
+  /portfolio/pnl:
+    get:
+      description: Get total profit/loss across all positions
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: Get total PnL
+      tags:
+      - portfolio
+  /portfolio/pnl/{symbol}:
+    get:
+      description: Calculate profit/loss for a symbol
+      parameters:
+      - description: Trading symbol (e.g., BTCUSDT)
+        in: path
+        name: symbol
+        required: true
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: Get PnL
+      tags:
+      - portfolio
+  /portfolio/position/{symbol}:
+    get:
+      description: Get position for a specific symbol
+      parameters:
+      - description: Trading symbol (e.g., BTCUSDT)
+        in: path
+        name: symbol
+        required: true
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: Get position
+      tags:
+      - portfolio
+  /portfolio/positions:
+    get:
+      description: Get all portfolio positions
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: Get all positions
+      tags:
+      - portfolio
+  /wallet/balance/{asset}:
+    get:
+      description: Get balance for a specific asset
+      parameters:
+      - description: Asset symbol (e.g., USDT, BTC)
+        in: path
+        name: asset
+        required: true
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: Get balance
+      tags:
+      - wallet
+  /wallet/balances:
+    get:
+      description: Get all wallet balances
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: Get all balances
+      tags:
+      - wallet
+swagger: "2.0"
