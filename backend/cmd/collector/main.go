@@ -15,7 +15,9 @@ func main() {
 	// Parse command line flags
 	symbol := flag.String("symbol", "BTCUSDT", "Trading pair symbol (e.g., BTCUSDT)")
 	interval := flag.String("interval", "1h", "Candle interval (e.g., 1m, 5m, 1h, 1d)")
-	days := flag.Int("days", 30, "Number of days to collect (from today backwards)")
+	days := flag.Int("days", 0, "Number of days to collect (from today backwards)")
+	startDate := flag.String("start", "", "Start date (YYYY-MM-DD format)")
+	endDate := flag.String("end", "", "End date (YYYY-MM-DD format)")
 	dbPath := flag.String("db", "data/trading.db", "Path to SQLite database file")
 
 	flag.Parse()
@@ -23,7 +25,6 @@ func main() {
 	log.Printf("=== Historical Data Collector ===")
 	log.Printf("Symbol: %s", *symbol)
 	log.Printf("Interval: %s", *interval)
-	log.Printf("Days: %d", *days)
 	log.Printf("Database: %s", *dbPath)
 
 	// Initialize database
@@ -46,8 +47,36 @@ func main() {
 	col := history.NewCollector(client, candleRepo)
 
 	// Calculate time range
-	endTime := time.Now()
-	startTime := endTime.AddDate(0, 0, -*days)
+	var startTime, endTime time.Time
+
+	// Priority: start/end dates > days
+	if *startDate != "" && *endDate != "" {
+		// Use start/end dates
+		startTime, err = time.Parse("2006-01-02", *startDate)
+		if err != nil {
+			log.Fatalf("Invalid start date format. Use YYYY-MM-DD: %v", err)
+		}
+		startTime = time.Date(startTime.Year(), startTime.Month(), startTime.Day(), 0, 0, 0, 0, time.UTC)
+
+		endTime, err = time.Parse("2006-01-02", *endDate)
+		if err != nil {
+			log.Fatalf("Invalid end date format. Use YYYY-MM-DD: %v", err)
+		}
+		endTime = time.Date(endTime.Year(), endTime.Month(), endTime.Day(), 23, 59, 59, 999999999, time.UTC)
+
+		log.Printf("Start Date: %s", *startDate)
+		log.Printf("End Date: %s", *endDate)
+	} else if *days > 0 {
+		// Use days
+		endTime = time.Now()
+		startTime = endTime.AddDate(0, 0, -*days)
+		log.Printf("Days: %d", *days)
+	} else {
+		// Default: 30 days
+		endTime = time.Now()
+		startTime = endTime.AddDate(0, 0, -30)
+		log.Printf("Days: 30 (default)")
+	}
 
 	// Collect historical data
 	ctx := context.Background()

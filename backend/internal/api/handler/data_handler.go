@@ -22,11 +22,13 @@ func NewDataHandler(dataService *history.Service) *DataHandler {
 
 // CollectHistoricalData godoc
 // @Summary Collect historical data
-// @Description Collect historical candle data from Binance
+// @Description Collect historical candle data from Binance (limited to 90 days via API, use CLI for larger datasets)
 // @Tags data
 // @Param symbol query string true "Trading symbol (e.g., BTCUSDT)"
 // @Param interval query string true "Candle interval (e.g., 1h, 1d)"
-// @Param days query int false "Number of days to collect (default: 30)"
+// @Param days query int false "Number of days to collect (from today backwards, max 90)"
+// @Param start query string false "Start date (YYYY-MM-DD format)"
+// @Param end query string false "End date (YYYY-MM-DD format)"
 // @Success 200 {object} response.Response
 // @Router /data/collect [post]
 func (h *DataHandler) CollectHistoricalData(c *gin.Context) {
@@ -38,22 +40,69 @@ func (h *DataHandler) CollectHistoricalData(c *gin.Context) {
 		return
 	}
 
-	days := 30
-	if daysParam := c.Query("days"); daysParam != "" {
-		var d int
-		for _, ch := range daysParam {
-			if ch < '0' || ch > '9' {
-				break
-			}
-			d = d*10 + int(ch-'0')
-		}
-		if d > 0 {
-			days = d
-		}
-	}
+	// API limit to prevent timeouts
+	const maxDaysViaAPI = 90
 
-	endTime := time.Now()
-	startTime := endTime.AddDate(0, 0, -days)
+	var startTime, endTime time.Time
+	var err error
+
+	// Priority: start/end dates > days
+	startStr := c.Query("start")
+	endStr := c.Query("end")
+
+	if startStr != "" && endStr != "" {
+		// Use start/end dates
+		startTime, err = time.Parse("2006-01-02", startStr)
+		if err != nil {
+			response.BadRequestResponse(c, "invalid start date format, use YYYY-MM-DD")
+			return
+		}
+		startTime = time.Date(startTime.Year(), startTime.Month(), startTime.Day(), 0, 0, 0, 0, time.UTC)
+
+		endTime, err = time.Parse("2006-01-02", endStr)
+		if err != nil {
+			response.BadRequestResponse(c, "invalid end date format, use YYYY-MM-DD")
+			return
+		}
+		endTime = time.Date(endTime.Year(), endTime.Month(), endTime.Day(), 23, 59, 59, 999999999, time.UTC)
+
+		// Check date range limit
+		daysDiff := int(endTime.Sub(startTime).Hours() / 24)
+		if daysDiff > maxDaysViaAPI {
+			response.BadRequestResponse(c,
+				"Date range too large. API is limited to 90 days to prevent timeouts. "+
+					"For larger datasets, please use the CLI: "+
+					"./bin/collector -symbol "+symbol+" -interval "+interval+" -start "+startStr+" -end "+endStr)
+			return
+		}
+	} else {
+		// Use days parameter
+		days := 30
+		if daysParam := c.Query("days"); daysParam != "" {
+			var d int
+			for _, ch := range daysParam {
+				if ch < '0' || ch > '9' {
+					break
+				}
+				d = d*10 + int(ch-'0')
+			}
+			if d > 0 {
+				days = d
+			}
+		}
+
+		// Check days limit
+		if days > maxDaysViaAPI {
+			response.BadRequestResponse(c,
+				"Too many days requested. API is limited to 90 days to prevent timeouts. "+
+					"For larger datasets, please use the CLI: "+
+					"./bin/collector -symbol "+symbol+" -interval "+interval+" -days "+c.Query("days"))
+			return
+		}
+
+		endTime = time.Now()
+		startTime = endTime.AddDate(0, 0, -days)
+	}
 
 	if err := h.dataService.CollectHistoricalData(c.Request.Context(), symbol, interval, startTime, endTime); err != nil {
 		response.InternalErrorResponse(c, err.Error())
