@@ -65,6 +65,7 @@ crypto-quant/
 
 - **[⚡ 빠른 시작 (Quick Start)](QUICKSTART.md)** - 5분 안에 시작하기
 - **[📘 사용 가이드 (Usage Guide)](docs/USAGE_GUIDE.md)** - 데이터 수집, 백테스트 실행 등 모든 사용법
+- **[🚀 배포 가이드 (Deployment Guide)](docs/DEPLOYMENT.md)** - 프로덕션 빌드 및 배포 방법
 - [📊 백테스팅 가이드](docs/BACKTEST.md) - 백테스팅 상세 설명
 - [🔌 백테스트 API 가이드](docs/API_BACKTEST.md) - REST API로 백테스트 사용하기
 - [🎯 Phase 2 완료 요약](docs/PHASE2_SUMMARY.md) - Phase 2 구현 내역
@@ -78,7 +79,9 @@ crypto-quant/
 - **Node.js 22+** - Frontend development
 - **PNPM** - Frontend package manager
 
-### Backend Setup
+### Development Setup
+
+#### Backend Only
 
 ```bash
 cd backend
@@ -94,7 +97,7 @@ go build -o bin/collector cmd/collector/main.go
 go build -o bin/backtest cmd/backtest/main.go
 ```
 
-### Frontend Setup
+#### Frontend Development
 
 ```bash
 cd frontend
@@ -102,12 +105,35 @@ cd frontend
 # Install dependencies
 pnpm install
 
-# Start development server
+# Start development server (with hot reload)
 pnpm dev
-
-# Build for production
-pnpm build
 ```
+
+### Production Build (with Embedded Frontend)
+
+Build a single binary that includes the frontend:
+
+```bash
+# Option 1: Using Makefile (recommended)
+cd backend
+make build-full
+
+# Option 2: Using build script
+./scripts/build.sh
+
+# Run the all-in-one binary
+cd backend
+./bin/api
+
+# Access at:
+# - Frontend: http://localhost:8080
+# - API: http://localhost:8080/api/v1
+# - Swagger: http://localhost:8080/swagger/index.html
+```
+
+> 💡 **Note**: The production binary embeds the frontend using Go's `embed` package, creating a single deployable binary.
+> 
+> For detailed build and deployment instructions, see the **[Deployment Guide](docs/DEPLOYMENT.md)**.
 
 ### Collecting Data
 
