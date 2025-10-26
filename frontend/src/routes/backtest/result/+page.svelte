@@ -92,9 +92,10 @@
 		const stored = sessionStorage.getItem('backtest_result');
 		if (stored) {
 			try {
-				result = JSON.parse(stored);
+				const parsed = JSON.parse(stored);
+				result = parsed as BacktestResult;
 				console.log('📊 백테스트 결과:', result);
-				console.log('📊 차트 데이터:', result.chart_data);
+				console.log('📊 차트 데이터:', result?.chart_data);
 			} catch (e) {
 				console.error('Failed to parse backtest result:', e);
 			}
@@ -190,6 +191,7 @@
 		const buyTrades = trades
 			.filter(t => t.side === 'BUY')
 			.map(t => ({
+				name: 'BUY',
 				coord: [new Date(t.timestamp).getTime(), t.equity],
 				value: 'BUY',
 				itemStyle: { color: '#10b981' }
@@ -198,6 +200,7 @@
 		const sellTrades = trades
 			.filter(t => t.side === 'SELL')
 			.map(t => ({
+				name: 'SELL',
 				coord: [new Date(t.timestamp).getTime(), t.equity],
 				value: 'SELL',
 				itemStyle: { color: '#ef4444' }
@@ -250,7 +253,6 @@
 			},
 			xAxis: {
 				type: 'time',
-				boundaryGap: false,
 				axisLabel: {
 					formatter: (value: number) => {
 						const date = new Date(value);
@@ -291,7 +293,7 @@
 					},
 					markPoint: {
 						symbol: 'circle',
-						symbolSize: 8,
+						symbolSize: 0,
 						label: {
 							show: false
 						},
@@ -337,6 +339,7 @@
 		const buyTrades = trades
 			.filter(t => t.side === 'BUY')
 			.map(t => ({
+				name: 'BUY',
 				coord: [new Date(t.timestamp).getTime(), t.price],
 				value: 'BUY',
 				itemStyle: { color: '#10b981' }
@@ -345,6 +348,7 @@
 		const sellTrades = trades
 			.filter(t => t.side === 'SELL')
 			.map(t => ({
+				name: 'SELL',
 				coord: [new Date(t.timestamp).getTime(), t.price],
 				value: 'SELL',
 				itemStyle: { color: '#ef4444' }
@@ -444,7 +448,6 @@
 			},
 			xAxis: {
 				type: 'time',
-				boundaryGap: false,
 				axisLabel: {
 					formatter: (value: number) => {
 						const date = new Date(value);

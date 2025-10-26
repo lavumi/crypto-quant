@@ -20,7 +20,6 @@ func SetupRouter(
 	dataHandler *handler.DataHandler,
 	walletHandler *handler.WalletHandler,
 	portfolioHandler *handler.PortfolioHandler,
-	orderHandler *handler.OrderHandler,
 	backtestHandler *handler.BacktestHandler,
 ) *gin.Engine {
 	// Set Gin mode
@@ -90,14 +89,6 @@ func SetupRouter(
 			portfolio.GET("/positions", portfolioHandler.GetAllPositions)
 			portfolio.GET("/pnl/:symbol", portfolioHandler.GetPnL)
 			portfolio.GET("/pnl", portfolioHandler.GetTotalPnL)
-		}
-
-		// Order routes
-		orders := v1.Group("/orders")
-		{
-			orders.POST("", orderHandler.PlaceOrder)
-			orders.GET("/:orderId", orderHandler.GetOrder)
-			orders.DELETE("/:orderId", orderHandler.CancelOrder)
 		}
 
 		// Backtest routes

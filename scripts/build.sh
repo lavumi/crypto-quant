@@ -70,3 +70,6 @@ echo -e "  cd ${PROJECT_ROOT}/backend"
 echo -e "  ./bin/api"
 echo -e "\n${YELLOW}Then open: http://localhost:8080${NC}"
 
+
+
+

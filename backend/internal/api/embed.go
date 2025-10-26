@@ -16,3 +16,7 @@ var frontendFS embed.FS
 func GetFrontendFS() (fs.FS, error) {
 	return fs.Sub(frontendFS, "frontend/build")
 }
+
+
+
+
