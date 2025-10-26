@@ -15,8 +15,8 @@
 	let positionSize = $state(0.01);
 
 	// Strategy selection
-	type Strategy = 'ma_cross' | 'rsi' | 'bb_rsi' | 'dca';
-	let selectedStrategy = $state<Strategy>('ma_cross');
+	type Strategy = 'ma_cross' | 'rsi' | 'bb_rsi' | 'dca' | 'golden_rsi_bb';
+	let selectedStrategy = $state<Strategy>('golden_rsi_bb');
 
 	// Strategy parameters
 	let fastPeriod = $state(10);
@@ -28,6 +28,18 @@
 	let bbStdDev = $state(2);
 	let dcaPeriod = $state('24h');
 	let dcaAmountUSDT = $state(100);
+	
+	// Golden RSI BB strategy parameters
+	let goldenFastPeriod = $state(5);
+	let goldenSlowPeriod = $state(20);
+	let goldenRsiPeriod = $state(14);
+	let goldenRsiLowerBound = $state(40);
+	let goldenRsiUpperBound = $state(70);
+	let goldenBbPeriod = $state(20);
+	let goldenBbMultiplier = $state(2.0);
+	let goldenVolumeThreshold = $state(1.3);
+	let goldenTakeProfitPct = $state(0.06);
+	let goldenStopLossPct = $state(0.03);
 
 	let isLoading = $state(false);
 	let error = $state('');
@@ -138,6 +150,17 @@
 			} else if (selectedStrategy === 'dca') {
 				requestBody.dca_period = dcaPeriod;
 				requestBody.dca_amount_usdt = dcaAmountUSDT;
+			} else if (selectedStrategy === 'golden_rsi_bb') {
+				requestBody.golden_fast_period = goldenFastPeriod;
+				requestBody.golden_slow_period = goldenSlowPeriod;
+				requestBody.golden_rsi_period = goldenRsiPeriod;
+				requestBody.golden_rsi_lower_bound = goldenRsiLowerBound;
+				requestBody.golden_rsi_upper_bound = goldenRsiUpperBound;
+				requestBody.golden_bb_period = goldenBbPeriod;
+				requestBody.golden_bb_multiplier = goldenBbMultiplier;
+				requestBody.golden_volume_threshold = goldenVolumeThreshold;
+				requestBody.golden_take_profit_pct = goldenTakeProfitPct;
+				requestBody.golden_stop_loss_pct = goldenStopLossPct;
 			}
 
 			console.log('🚀 백테스트 요청:', requestBody);
@@ -373,6 +396,19 @@
 							일정 기간마다 고정 금액을 자동 매수
 						</p>
 					</button>
+
+					<button
+						class="w-full text-left p-4 rounded-lg border-2 transition-all {selectedStrategy ===
+						'golden_rsi_bb'
+							? 'border-primary bg-primary/5'
+							: 'border-border hover:border-primary/50'}"
+						onclick={() => (selectedStrategy = 'golden_rsi_bb')}
+					>
+						<div class="font-semibold">🎯 골든크로스 + RSI + 볼린저밴드</div>
+						<p class="text-sm text-muted-foreground mt-1">
+							다중 지표 확인 + 거래량 필터 + 명확한 익절/손절 (고급)
+						</p>
+					</button>
 				</div>
 			</Card>
 		</div>
@@ -576,6 +612,193 @@
 								<small class="text-muted-foreground">
 									※ 가격 변동성을 분산시켜 평균 매수가를 낮추는 전략
 								</small>
+							</p>
+						</div>
+					</div>
+				{:else if selectedStrategy === 'golden_rsi_bb'}
+					<div class="space-y-4">
+						<div class="bg-primary/10 p-4 rounded-lg border border-primary/20 mb-4">
+							<p class="text-sm font-semibold mb-2">🎯 고급 복합 전략</p>
+							<p class="text-xs text-muted-foreground">
+								4가지 진입 조건 + 3가지 청산 조건을 사용하는 엄격한 전략입니다.
+							</p>
+						</div>
+
+						<div class="border-t pt-4">
+							<h3 class="font-semibold mb-3 text-sm">📈 이동평균 (골든/데드 크로스)</h3>
+							<div class="grid grid-cols-2 gap-4">
+								<div>
+									<Label for="goldenFastPeriod">빠른 MA 기간</Label>
+									<Input
+										id="goldenFastPeriod"
+										type="number"
+										bind:value={goldenFastPeriod}
+										min="1"
+										max="50"
+										class="mt-1.5"
+									/>
+									<p class="text-xs text-muted-foreground mt-1">기본: 5일선</p>
+								</div>
+								<div>
+									<Label for="goldenSlowPeriod">느린 MA 기간</Label>
+									<Input
+										id="goldenSlowPeriod"
+										type="number"
+										bind:value={goldenSlowPeriod}
+										min="1"
+										max="200"
+										class="mt-1.5"
+									/>
+									<p class="text-xs text-muted-foreground mt-1">기본: 20일선</p>
+								</div>
+							</div>
+						</div>
+
+						<div class="border-t pt-4">
+							<h3 class="font-semibold mb-3 text-sm">📊 RSI 필터</h3>
+							<div>
+								<Label for="goldenRsiPeriod">RSI 기간</Label>
+								<Input
+									id="goldenRsiPeriod"
+									type="number"
+									bind:value={goldenRsiPeriod}
+									min="2"
+									max="50"
+									class="mt-1.5"
+								/>
+							</div>
+							<div class="grid grid-cols-2 gap-4 mt-4">
+								<div>
+									<Label for="goldenRsiLowerBound">RSI 하한선</Label>
+									<Input
+										id="goldenRsiLowerBound"
+										type="number"
+										bind:value={goldenRsiLowerBound}
+										min="0"
+										max="100"
+										class="mt-1.5"
+									/>
+									<p class="text-xs text-muted-foreground mt-1">이 값 이상이어야 진입</p>
+								</div>
+								<div>
+									<Label for="goldenRsiUpperBound">RSI 상한선</Label>
+									<Input
+										id="goldenRsiUpperBound"
+										type="number"
+										bind:value={goldenRsiUpperBound}
+										min="0"
+										max="100"
+										class="mt-1.5"
+									/>
+									<p class="text-xs text-muted-foreground mt-1">이 값 이하여야 진입</p>
+								</div>
+							</div>
+							<p class="text-xs text-muted-foreground mt-2">
+								💡 RSI {goldenRsiLowerBound}-{goldenRsiUpperBound} 구간에서만 진입
+							</p>
+						</div>
+
+						<div class="border-t pt-4">
+							<h3 class="font-semibold mb-3 text-sm">📉 볼린저밴드</h3>
+							<div class="grid grid-cols-2 gap-4">
+								<div>
+									<Label for="goldenBbPeriod">BB 기간</Label>
+									<Input
+										id="goldenBbPeriod"
+										type="number"
+										bind:value={goldenBbPeriod}
+										min="2"
+										max="100"
+										class="mt-1.5"
+									/>
+								</div>
+								<div>
+									<Label for="goldenBbMultiplier">표준편차 배수</Label>
+									<Input
+										id="goldenBbMultiplier"
+										type="number"
+										bind:value={goldenBbMultiplier}
+										min="0.5"
+										max="5"
+										step="0.1"
+										class="mt-1.5"
+									/>
+								</div>
+							</div>
+							<p class="text-xs text-muted-foreground mt-2">
+								💡 가격이 BB 중간선 위에 있어야 진입
+							</p>
+						</div>
+
+						<div class="border-t pt-4">
+							<h3 class="font-semibold mb-3 text-sm">📦 거래량 필터</h3>
+							<div>
+								<Label for="goldenVolumeThreshold">거래량 배율</Label>
+								<Input
+									id="goldenVolumeThreshold"
+									type="number"
+									bind:value={goldenVolumeThreshold}
+									min="1.0"
+									max="3.0"
+									step="0.1"
+									class="mt-1.5"
+								/>
+								<p class="text-xs text-muted-foreground mt-1">
+									평균 거래량의 {goldenVolumeThreshold}배 이상이어야 진입
+								</p>
+							</div>
+						</div>
+
+						<div class="border-t pt-4">
+							<h3 class="font-semibold mb-3 text-sm">💰 익절/손절</h3>
+							<div class="grid grid-cols-2 gap-4">
+								<div>
+									<Label for="goldenTakeProfitPct">익절 (%)</Label>
+									<Input
+										id="goldenTakeProfitPct"
+										type="number"
+										bind:value={goldenTakeProfitPct}
+										min="0.01"
+										max="0.50"
+										step="0.01"
+										class="mt-1.5"
+									/>
+									<p class="text-xs text-muted-foreground mt-1">
+										+{(goldenTakeProfitPct * 100).toFixed(1)}% 도달 시 매도
+									</p>
+								</div>
+								<div>
+									<Label for="goldenStopLossPct">손절 (%)</Label>
+									<Input
+										id="goldenStopLossPct"
+										type="number"
+										bind:value={goldenStopLossPct}
+										min="0.01"
+										max="0.20"
+										step="0.01"
+										class="mt-1.5"
+									/>
+									<p class="text-xs text-muted-foreground mt-1">
+										-{(goldenStopLossPct * 100).toFixed(1)}% 도달 시 손절
+									</p>
+								</div>
+							</div>
+							<p class="text-xs text-muted-foreground mt-2">
+								💡 리스크-리워드 비율: 1:{(goldenTakeProfitPct / goldenStopLossPct).toFixed(1)}
+							</p>
+						</div>
+
+						<div class="bg-muted/50 p-4 rounded-lg">
+							<p class="text-sm">
+								<strong>진입 조건 (모두 만족 필요):</strong><br />
+								✅ MA{goldenFastPeriod} &gt; MA{goldenSlowPeriod} (골든크로스)<br />
+								✅ RSI {goldenRsiLowerBound}-{goldenRsiUpperBound} 구간<br />
+								✅ 가격 &gt; 볼린저 중간선<br />
+								✅ 거래량 &gt;= 평균 × {goldenVolumeThreshold}<br /><br />
+								<strong>청산 조건 (하나만 만족):</strong><br />
+								💰 익절: +{(goldenTakeProfitPct * 100).toFixed(0)}%<br />
+								🛑 손절: -{(goldenStopLossPct * 100).toFixed(0)}%<br />
+								📉 데드크로스: MA{goldenFastPeriod} &lt; MA{goldenSlowPeriod}
 							</p>
 						</div>
 					</div>

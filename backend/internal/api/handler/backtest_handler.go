@@ -48,6 +48,18 @@ type BacktestRequest struct {
 	DCAPeriod     string  `json:"dca_period" example:"24h"`
 	DCAAmountUSDT float64 `json:"dca_amount_usdt" example:"100"`
 
+	// Strategy parameters (Golden RSI BB)
+	GoldenFastPeriod      int     `json:"golden_fast_period" example:"5"`
+	GoldenSlowPeriod      int     `json:"golden_slow_period" example:"20"`
+	GoldenRSIPeriod       int     `json:"golden_rsi_period" example:"14"`
+	GoldenRSILowerBound   float64 `json:"golden_rsi_lower_bound" example:"40"`
+	GoldenRSIUpperBound   float64 `json:"golden_rsi_upper_bound" example:"70"`
+	GoldenBBPeriod        int     `json:"golden_bb_period" example:"20"`
+	GoldenBBMultiplier    float64 `json:"golden_bb_multiplier" example:"2.0"`
+	GoldenVolumeThreshold float64 `json:"golden_volume_threshold" example:"1.3"`
+	GoldenTakeProfitPct   float64 `json:"golden_take_profit_pct" example:"0.06"`
+	GoldenStopLossPct     float64 `json:"golden_stop_loss_pct" example:"0.03"`
+
 	// Position size
 	PositionSize float64 `json:"position_size" example:"0.01"`
 }
@@ -280,8 +292,66 @@ func (h *BacktestHandler) RunBacktest(c *gin.Context) {
 
 		strat = strategy.NewDCAStrategy(period, amountUSDT)
 
+	case "golden_rsi_bb":
+		// Use defaults if not provided
+		fastPeriod := req.GoldenFastPeriod
+		slowPeriod := req.GoldenSlowPeriod
+		rsiPeriod := req.GoldenRSIPeriod
+		rsiLowerBound := req.GoldenRSILowerBound
+		rsiUpperBound := req.GoldenRSIUpperBound
+		bbPeriod := req.GoldenBBPeriod
+		bbMultiplier := req.GoldenBBMultiplier
+		volumeThreshold := req.GoldenVolumeThreshold
+		takeProfitPct := req.GoldenTakeProfitPct
+		stopLossPct := req.GoldenStopLossPct
+
+		// Apply defaults
+		if fastPeriod == 0 {
+			fastPeriod = 5
+		}
+		if slowPeriod == 0 {
+			slowPeriod = 20
+		}
+		if rsiPeriod == 0 {
+			rsiPeriod = 14
+		}
+		if rsiLowerBound == 0 {
+			rsiLowerBound = 40
+		}
+		if rsiUpperBound == 0 {
+			rsiUpperBound = 70
+		}
+		if bbPeriod == 0 {
+			bbPeriod = 20
+		}
+		if bbMultiplier == 0 {
+			bbMultiplier = 2.0
+		}
+		if volumeThreshold == 0 {
+			volumeThreshold = 1.3
+		}
+		if takeProfitPct == 0 {
+			takeProfitPct = 0.06
+		}
+		if stopLossPct == 0 {
+			stopLossPct = 0.03
+		}
+
+		// Can use default constructor or custom constructor
+		if req.GoldenFastPeriod == 0 && req.GoldenSlowPeriod == 0 {
+			// Use simple default constructor
+			strat = strategy.NewGoldenRSIBBStrategy(req.PositionSize)
+		} else {
+			// Use custom constructor with all parameters
+			strat = strategy.NewCustomGoldenRSIBBStrategy(
+				fastPeriod, slowPeriod, rsiPeriod, bbPeriod,
+				rsiLowerBound, rsiUpperBound, bbMultiplier, volumeThreshold,
+				takeProfitPct, stopLossPct, req.PositionSize,
+			)
+		}
+
 	default:
-		response.Error(c, http.StatusBadRequest, "Unknown strategy: "+req.Strategy+". Available: ma_cross, rsi, bb_rsi, dca")
+		response.Error(c, http.StatusBadRequest, "Unknown strategy: "+req.Strategy+". Available: ma_cross, rsi, bb_rsi, dca, golden_rsi_bb")
 		return
 	}
 
@@ -452,6 +522,67 @@ func (h *BacktestHandler) GetStrategies(c *gin.Context) {
 					"type":        "float",
 					"default":     100,
 					"description": "Amount in USDT to purchase each interval",
+				},
+			},
+		},
+		"golden_rsi_bb": map[string]interface{}{
+			"name":        "Golden Cross + RSI + Bollinger Bands",
+			"description": "Advanced strategy with Golden Cross (MA5>MA20), RSI filter (40-70), BB confirmation, and volume spike (1.3x). Exits on +6% profit, -3% loss, or death cross.",
+			"parameters": map[string]interface{}{
+				"golden_fast_period": map[string]interface{}{
+					"type":        "integer",
+					"default":     5,
+					"description": "Fast MA period (for golden/death cross detection)",
+				},
+				"golden_slow_period": map[string]interface{}{
+					"type":        "integer",
+					"default":     20,
+					"description": "Slow MA period (for golden/death cross detection)",
+				},
+				"golden_rsi_period": map[string]interface{}{
+					"type":        "integer",
+					"default":     14,
+					"description": "RSI calculation period",
+				},
+				"golden_rsi_lower_bound": map[string]interface{}{
+					"type":        "float",
+					"default":     40,
+					"description": "RSI lower bound (entry requires RSI >= this value)",
+				},
+				"golden_rsi_upper_bound": map[string]interface{}{
+					"type":        "float",
+					"default":     70,
+					"description": "RSI upper bound (entry requires RSI <= this value)",
+				},
+				"golden_bb_period": map[string]interface{}{
+					"type":        "integer",
+					"default":     20,
+					"description": "Bollinger Bands period",
+				},
+				"golden_bb_multiplier": map[string]interface{}{
+					"type":        "float",
+					"default":     2.0,
+					"description": "Bollinger Bands standard deviation multiplier",
+				},
+				"golden_volume_threshold": map[string]interface{}{
+					"type":        "float",
+					"default":     1.3,
+					"description": "Volume multiplier threshold (entry requires volume >= avg * threshold)",
+				},
+				"golden_take_profit_pct": map[string]interface{}{
+					"type":        "float",
+					"default":     0.06,
+					"description": "Take profit percentage (0.06 = 6%)",
+				},
+				"golden_stop_loss_pct": map[string]interface{}{
+					"type":        "float",
+					"default":     0.03,
+					"description": "Stop loss percentage (0.03 = 3%)",
+				},
+				"position_size": map[string]interface{}{
+					"type":        "float",
+					"default":     0.01,
+					"description": "Position size per trade",
 				},
 			},
 		},

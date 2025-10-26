@@ -14,7 +14,6 @@ import (
 	"github.com/lavumi/crypto-quant/internal/datasource/exchange"
 	"github.com/lavumi/crypto-quant/internal/datasource/market/history"
 	"github.com/lavumi/crypto-quant/internal/datasource/market/price"
-	"github.com/lavumi/crypto-quant/internal/trading"
 	"github.com/lavumi/crypto-quant/internal/portfolio"
 	"github.com/lavumi/crypto-quant/internal/portfolio/wallet"
 
@@ -103,18 +102,16 @@ func main() {
 	dataService := history.NewService(candleRepo, tradeRepo, binanceClient)
 	walletService := wallet.NewService(walletManager)
 	portfolioService := portfolio.NewService(portfolioManager, binanceExchange)
-	orderService := order.NewService(walletManager, portfolioManager, binanceExchange)
 
 	// Initialize handlers
 	marketHandler := handler.NewMarketHandler(marketService)
 	dataHandler := handler.NewDataHandler(dataService)
 	walletHandler := handler.NewWalletHandler(walletService)
 	portfolioHandler := handler.NewPortfolioHandler(portfolioService)
-	orderHandler := handler.NewOrderHandler(orderService)
 	backtestHandler := handler.NewBacktestHandler(dataService)
 
 	// Setup router
-	r := api.SetupRouter(marketHandler, dataHandler, walletHandler, portfolioHandler, orderHandler, backtestHandler)
+	r := api.SetupRouter(marketHandler, dataHandler, walletHandler, portfolioHandler, backtestHandler)
 
 	// Start server
 	log.Printf("API server starting on port %s", *port)
