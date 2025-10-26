@@ -24,7 +24,7 @@ type Strategy interface {
 // Signal represents a trading signal
 type Signal struct {
 	Action   domain.OrderSide // BUY or SELL
-	Quantity float64          // Amount to trade
+	Quantity float64          // Position size as percentage (0.0 - 1.0, e.g., 0.5 = 50% of balance/position)
 	Price    float64          // Limit price (0 for market order)
 	Reason   string           // Reason for the signal
 }
@@ -131,11 +131,20 @@ func (e *Engine) executeSignal(candle *domain.Candle, signal *Signal) error {
 		price = candle.Close // Market order uses close price
 	}
 
+	// Convert percentage to actual quantity
+	var actualQuantity float64
 	switch signal.Action {
 	case domain.OrderSideBuy:
-		return e.executeBuy(candle.OpenTime, price, signal.Quantity, signal.Reason)
+		// For buy: use percentage of available balance
+		// Calculate how many coins we can buy with (balance * percentage)
+		availableAmount := e.balance * signal.Quantity
+		// Account for commission when calculating quantity
+		actualQuantity = availableAmount / (price * (1 + e.commission))
+		return e.executeBuy(candle.OpenTime, price, actualQuantity, signal.Reason)
 	case domain.OrderSideSell:
-		return e.executeSell(candle.OpenTime, price, signal.Quantity, signal.Reason)
+		// For sell: use percentage of current position
+		actualQuantity = e.position
+		return e.executeSell(candle.OpenTime, price, actualQuantity, signal.Reason)
 	default:
 		return fmt.Errorf("unknown order side: %s", signal.Action)
 	}
@@ -217,6 +226,3 @@ func (e *Engine) GetTrades() []*Trade {
 func (e *Engine) GetEquity() []EquityPoint {
 	return e.equity
 }
-
-
-

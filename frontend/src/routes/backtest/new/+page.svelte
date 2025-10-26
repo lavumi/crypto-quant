@@ -4,42 +4,55 @@
 	import Input from '$lib/components/ui/Input.svelte';
 	import Label from '$lib/components/ui/Label.svelte';
 	import Select from '$lib/components/ui/Select.svelte';
+	import { onMount } from 'svelte';
 
-	// Form state
-	let symbol = $state('BTCUSDT');
-	let interval = $state('1h');
-	let startDate = $state('2025-07-01');
-	let endDate = $state('2025-10-17');
-	let initialBalance = $state(10000);
-	let commission = $state(0.001);
-	let positionSize = $state(0.01);
+	// Load from localStorage or use defaults
+	function loadFromStorage<T>(key: string, defaultValue: T): T {
+		if (typeof window === 'undefined') return defaultValue;
+		const stored = localStorage.getItem(key);
+		if (!stored) return defaultValue;
+		try {
+			return JSON.parse(stored) as T;
+		} catch {
+			return defaultValue;
+		}
+	}
+
+	// Form state with localStorage persistence
+	let symbol = $state(loadFromStorage('backtest_symbol', 'BTCUSDT'));
+	let interval = $state(loadFromStorage('backtest_interval', '1h'));
+	let startDate = $state(loadFromStorage('backtest_startDate', '2024-01-01'));
+	let endDate = $state(loadFromStorage('backtest_endDate', '2025-10-17'));
+	let initialBalance = $state(loadFromStorage('backtest_initialBalance', 10000));
+	let commission = $state(loadFromStorage('backtest_commission', 0.001));
+	let positionSize = $state(loadFromStorage('backtest_positionSize', 0.5));
 
 	// Strategy selection
 	type Strategy = 'ma_cross' | 'rsi' | 'bb_rsi' | 'dca' | 'golden_rsi_bb';
-	let selectedStrategy = $state<Strategy>('golden_rsi_bb');
+	let selectedStrategy = $state<Strategy>(loadFromStorage('backtest_strategy', 'golden_rsi_bb'));
 
 	// Strategy parameters
-	let fastPeriod = $state(10);
-	let slowPeriod = $state(30);
-	let rsiPeriod = $state(14);
-	let rsiOversold = $state(30);
-	let rsiOverbought = $state(70);
-	let bbPeriod = $state(20);
-	let bbStdDev = $state(2);
-	let dcaPeriod = $state('24h');
-	let dcaAmountUSDT = $state(100);
+	let fastPeriod = $state(loadFromStorage('backtest_fastPeriod', 10));
+	let slowPeriod = $state(loadFromStorage('backtest_slowPeriod', 30));
+	let rsiPeriod = $state(loadFromStorage('backtest_rsiPeriod', 14));
+	let rsiOversold = $state(loadFromStorage('backtest_rsiOversold', 30));
+	let rsiOverbought = $state(loadFromStorage('backtest_rsiOverbought', 70));
+	let bbPeriod = $state(loadFromStorage('backtest_bbPeriod', 20));
+	let bbStdDev = $state(loadFromStorage('backtest_bbStdDev', 2));
+	let dcaPeriod = $state(loadFromStorage('backtest_dcaPeriod', '24h'));
+	let dcaAmountUSDT = $state(loadFromStorage('backtest_dcaAmountUSDT', 100));
 	
 	// Golden RSI BB strategy parameters
-	let goldenFastPeriod = $state(5);
-	let goldenSlowPeriod = $state(20);
-	let goldenRsiPeriod = $state(14);
-	let goldenRsiLowerBound = $state(40);
-	let goldenRsiUpperBound = $state(70);
-	let goldenBbPeriod = $state(20);
-	let goldenBbMultiplier = $state(2.0);
-	let goldenVolumeThreshold = $state(1.3);
-	let goldenTakeProfitPct = $state(0.06);
-	let goldenStopLossPct = $state(0.03);
+	let goldenFastPeriod = $state(loadFromStorage('backtest_goldenFastPeriod', 5));
+	let goldenSlowPeriod = $state(loadFromStorage('backtest_goldenSlowPeriod', 20));
+	let goldenRsiPeriod = $state(loadFromStorage('backtest_goldenRsiPeriod', 14));
+	let goldenRsiLowerBound = $state(loadFromStorage('backtest_goldenRsiLowerBound', 40));
+	let goldenRsiUpperBound = $state(loadFromStorage('backtest_goldenRsiUpperBound', 70));
+	let goldenBbPeriod = $state(loadFromStorage('backtest_goldenBbPeriod', 20));
+	let goldenBbMultiplier = $state(loadFromStorage('backtest_goldenBbMultiplier', 2.0));
+	let goldenVolumeThreshold = $state(loadFromStorage('backtest_goldenVolumeThreshold', 1.3));
+	let goldenTakeProfitPct = $state(loadFromStorage('backtest_goldenTakeProfitPct', 0.06));
+	let goldenStopLossPct = $state(loadFromStorage('backtest_goldenStopLossPct', 0.03));
 
 	let isLoading = $state(false);
 	let error = $state('');
@@ -49,6 +62,38 @@
 		isComplete: boolean;
 		message: string;
 	} | null>(null);
+
+	// Save to localStorage whenever values change
+	$effect(() => {
+		if (typeof window === 'undefined') return;
+		localStorage.setItem('backtest_symbol', JSON.stringify(symbol));
+		localStorage.setItem('backtest_interval', JSON.stringify(interval));
+		localStorage.setItem('backtest_startDate', JSON.stringify(startDate));
+		localStorage.setItem('backtest_endDate', JSON.stringify(endDate));
+		localStorage.setItem('backtest_initialBalance', JSON.stringify(initialBalance));
+		localStorage.setItem('backtest_commission', JSON.stringify(commission));
+		localStorage.setItem('backtest_positionSize', JSON.stringify(positionSize));
+		localStorage.setItem('backtest_strategy', JSON.stringify(selectedStrategy));
+		localStorage.setItem('backtest_fastPeriod', JSON.stringify(fastPeriod));
+		localStorage.setItem('backtest_slowPeriod', JSON.stringify(slowPeriod));
+		localStorage.setItem('backtest_rsiPeriod', JSON.stringify(rsiPeriod));
+		localStorage.setItem('backtest_rsiOversold', JSON.stringify(rsiOversold));
+		localStorage.setItem('backtest_rsiOverbought', JSON.stringify(rsiOverbought));
+		localStorage.setItem('backtest_bbPeriod', JSON.stringify(bbPeriod));
+		localStorage.setItem('backtest_bbStdDev', JSON.stringify(bbStdDev));
+		localStorage.setItem('backtest_dcaPeriod', JSON.stringify(dcaPeriod));
+		localStorage.setItem('backtest_dcaAmountUSDT', JSON.stringify(dcaAmountUSDT));
+		localStorage.setItem('backtest_goldenFastPeriod', JSON.stringify(goldenFastPeriod));
+		localStorage.setItem('backtest_goldenSlowPeriod', JSON.stringify(goldenSlowPeriod));
+		localStorage.setItem('backtest_goldenRsiPeriod', JSON.stringify(goldenRsiPeriod));
+		localStorage.setItem('backtest_goldenRsiLowerBound', JSON.stringify(goldenRsiLowerBound));
+		localStorage.setItem('backtest_goldenRsiUpperBound', JSON.stringify(goldenRsiUpperBound));
+		localStorage.setItem('backtest_goldenBbPeriod', JSON.stringify(goldenBbPeriod));
+		localStorage.setItem('backtest_goldenBbMultiplier', JSON.stringify(goldenBbMultiplier));
+		localStorage.setItem('backtest_goldenVolumeThreshold', JSON.stringify(goldenVolumeThreshold));
+		localStorage.setItem('backtest_goldenTakeProfitPct', JSON.stringify(goldenTakeProfitPct));
+		localStorage.setItem('backtest_goldenStopLossPct', JSON.stringify(goldenStopLossPct));
+	});
 
 	const symbolOptions = [
 		{ value: 'BTCUSDT', label: 'BTC/USDT' },

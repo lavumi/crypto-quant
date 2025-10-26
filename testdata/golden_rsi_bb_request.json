@@ -6,7 +6,7 @@
   "initial_balance": 10000,
   "commission": 0.001,
   "strategy": "golden_rsi_bb",
-  "position_size": 0.01,
+  "position_size": 0.5,
   "golden_fast_period": 5,
   "golden_slow_period": 20,
   "golden_rsi_period": 14,
