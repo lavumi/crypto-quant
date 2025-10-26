@@ -613,10 +613,8 @@
 		<!-- 거래 내역 -->
 		<Card class="p-6">
 			<h2 class="text-xl font-semibold mb-4">
-				거래 내역 
-				{#if result.total_trades > 20}
-					<span class="text-sm text-muted-foreground font-normal">(최근 20개)</span>
-				{/if}
+				거래 내역
+				<span class="text-sm text-muted-foreground font-normal">(전체 {result.total_trades}개)</span>
 			</h2>
 
 			{#if result.recent_trades && result.recent_trades.length > 0}

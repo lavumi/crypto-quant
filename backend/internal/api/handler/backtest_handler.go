@@ -96,7 +96,7 @@ type BacktestResponse struct {
 	Commission  float64 `json:"commission" example:"0.001"`
 	CandlesUsed int     `json:"candles_used" example:"2152"`
 
-	// Trade details (optional, limited to first 20)
+	// Trade details (all trades)
 	RecentTrades []TradeDetail `json:"recent_trades,omitempty"`
 
 	// Chart data for visualization
@@ -368,35 +368,19 @@ func (h *BacktestHandler) RunBacktest(c *gin.Context) {
 		return
 	}
 
-	// Convert trades to response format (limit to 20 most recent)
-	recentTrades := make([]TradeDetail, 0)
-	maxTrades := 20
-	if len(result.Trades) > maxTrades {
-		for _, trade := range result.Trades[:maxTrades] {
-			recentTrades = append(recentTrades, TradeDetail{
-				Timestamp: trade.Timestamp.Format(time.RFC3339),
-				Side:      string(trade.Side),
-				Price:     trade.Price,
-				Quantity:  trade.Quantity,
-				Fee:       trade.Fee,
-				Balance:   trade.Balance,
-				Position:  trade.Position,
-				Reason:    trade.Reason,
-			})
-		}
-	} else {
-		for _, trade := range result.Trades {
-			recentTrades = append(recentTrades, TradeDetail{
-				Timestamp: trade.Timestamp.Format(time.RFC3339),
-				Side:      string(trade.Side),
-				Price:     trade.Price,
-				Quantity:  trade.Quantity,
-				Fee:       trade.Fee,
-				Balance:   trade.Balance,
-				Position:  trade.Position,
-				Reason:    trade.Reason,
-			})
-		}
+	// Convert all trades to response format
+	recentTrades := make([]TradeDetail, 0, len(result.Trades))
+	for _, trade := range result.Trades {
+		recentTrades = append(recentTrades, TradeDetail{
+			Timestamp: trade.Timestamp.Format(time.RFC3339),
+			Side:      string(trade.Side),
+			Price:     trade.Price,
+			Quantity:  trade.Quantity,
+			Fee:       trade.Fee,
+			Balance:   trade.Balance,
+			Position:  trade.Position,
+			Reason:    trade.Reason,
+		})
 	}
 
 	// Build chart data with strategy-specific indicators
