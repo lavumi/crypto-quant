@@ -46,28 +46,32 @@ echo -e "${GREEN}✓ Frontend copied to: ${EMBED_DIR}${NC}"
 echo -e "\n${GREEN}[3/3] Building backend...${NC}"
 cd "${PROJECT_ROOT}/backend"
 
+# Create server directory in project root
+SERVER_DIR="${PROJECT_ROOT}/server"
+mkdir -p "${SERVER_DIR}"
+
 # Build API server
 echo "Building api..."
-go build -o bin/api ./cmd/api
+go build -o "${SERVER_DIR}/api" ./cmd/api
 
 # Build other binaries
 echo "Building collector..."
-go build -o bin/collector ./cmd/collector
+go build -o "${SERVER_DIR}/collector" ./cmd/collector
 
 echo "Building backtest..."
-go build -o bin/backtest ./cmd/backtest
+go build -o "${SERVER_DIR}/backtest" ./cmd/backtest
 
 echo -e "${GREEN}✓ Backend built successfully${NC}"
 
 # Summary
 echo -e "\n${GREEN}=== Build Complete ===${NC}"
 echo -e "${GREEN}Binaries:${NC}"
-echo -e "  • ${PROJECT_ROOT}/backend/bin/api"
-echo -e "  • ${PROJECT_ROOT}/backend/bin/collector"
-echo -e "  • ${PROJECT_ROOT}/backend/bin/backtest"
+echo -e "  • ${SERVER_DIR}/api"
+echo -e "  • ${SERVER_DIR}/collector"
+echo -e "  • ${SERVER_DIR}/backtest"
 echo -e "\n${YELLOW}To run the API server with embedded frontend:${NC}"
-echo -e "  cd ${PROJECT_ROOT}/backend"
-echo -e "  ./bin/api"
+echo -e "  cd ${PROJECT_ROOT}"
+echo -e "  ./server/api"
 echo -e "\n${YELLOW}Then open: http://localhost:8080${NC}"
 
 
