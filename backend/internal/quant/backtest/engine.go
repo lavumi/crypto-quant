@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"math"
 	"time"
 
 	"github.com/lavumi/crypto-quant/internal/domain"
@@ -137,7 +138,9 @@ func (e *Engine) executeSignal(candle *domain.Candle, signal *Signal) error {
 	case domain.OrderSideBuy:
 		// For buy: use percentage of available balance
 		// Calculate how many coins we can buy with (balance * percentage)
-		availableAmount := e.balance * signal.Quantity
+		availableAmount := e.balance*signal.Quantity - 1
+		// Truncate to 2 decimal places to prevent floating point errors
+		availableAmount = math.Floor(availableAmount*100) / 100
 		// Account for commission when calculating quantity
 		actualQuantity = availableAmount / (price * (1 + e.commission))
 		return e.executeBuy(candle.OpenTime, price, actualQuantity, signal.Reason)
