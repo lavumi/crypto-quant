@@ -36,6 +36,9 @@ type Engine struct {
 	strategy       Strategy
 	initialBalance float64
 	commission     float64 // Commission rate (e.g., 0.001 for 0.1%)
+	feeModel       FeeModel
+	slippageModel  SlippageModel
+	riskManager    RiskManager
 
 	// Persistence
 	persist    bool
@@ -75,6 +78,9 @@ type Config struct {
 	InitialBalance float64
 	Commission     float64
 	Strategy       Strategy
+	FeeModel       FeeModel
+	SlippageModel  SlippageModel
+	RiskManager    RiskManager
 	// Optional persistence settings
 	Persist    bool
 	DB         *database.DB
@@ -85,10 +91,28 @@ type Config struct {
 
 // NewEngine creates a new backtesting engine
 func NewEngine(cfg *Config) *Engine {
+	feeModel := cfg.FeeModel
+	if feeModel == nil {
+		feeModel = NewFixedRateFeeModel(cfg.Commission)
+	}
+
+	slippageModel := cfg.SlippageModel
+	if slippageModel == nil {
+		slippageModel = NoSlippageModel{}
+	}
+
+	riskManager := cfg.RiskManager
+	if riskManager == nil {
+		riskManager = NoopRiskManager{}
+	}
+
 	return &Engine{
 		strategy:       cfg.Strategy,
 		initialBalance: cfg.InitialBalance,
 		commission:     cfg.Commission,
+		feeModel:       feeModel,
+		slippageModel:  slippageModel,
+		riskManager:    riskManager,
 		persist:        cfg.Persist,
 		db:             cfg.DB,
 		symbol:         cfg.Symbol,
@@ -245,22 +269,60 @@ func (e *Engine) executeSignal(candle *domain.Candle, signal *Signal) error {
 		availableAmount := e.balance*signal.Quantity - 1
 		// Truncate to 2 decimal places to prevent floating point errors
 		availableAmount = math.Floor(availableAmount*100) / 100
-		// Account for commission when calculating quantity
-		actualQuantity = availableAmount / (price * (1 + e.commission))
-		return e.executeBuy(candle.OpenTime, price, actualQuantity, signal.Reason)
+		if availableAmount <= 0 {
+			return fmt.Errorf("insufficient balance allocated for buy: %.2f", availableAmount)
+		}
+		actualQuantity = availableAmount / price
 	case domain.OrderSideSell:
 		// For sell: use percentage of current position
-		actualQuantity = e.position
-		return e.executeSell(candle.OpenTime, price, actualQuantity, signal.Reason)
+		actualQuantity = e.position * signal.Quantity
+		if signal.Quantity <= 0 || signal.Quantity > 1 {
+			actualQuantity = e.position
+		}
 	default:
 		return fmt.Errorf("unknown order side: %s", signal.Action)
+	}
+
+	if actualQuantity <= 0 {
+		return fmt.Errorf("non-positive order quantity: %.8f", actualQuantity)
+	}
+
+	intent := OrderIntent{
+		Timestamp: candle.OpenTime,
+		Side:      signal.Action,
+		Price:     price,
+		Quantity:  actualQuantity,
+		Reason:    signal.Reason,
+	}
+	intent.Price = e.slippageModel.Apply(intent)
+	if intent.Price <= 0 {
+		return fmt.Errorf("invalid execution price: %.8f", intent.Price)
+	}
+
+	state := PortfolioState{
+		Balance:  e.balance,
+		Position: e.position,
+		Equity:   e.calculateEquity(candle.Close),
+	}
+
+	if err := e.riskManager.Validate(intent, state); err != nil {
+		return fmt.Errorf("risk check failed: %w", err)
+	}
+
+	switch intent.Side {
+	case domain.OrderSideBuy:
+		return e.executeBuy(intent)
+	case domain.OrderSideSell:
+		return e.executeSell(intent)
+	default:
+		return fmt.Errorf("unknown order side: %s", intent.Side)
 	}
 }
 
 // executeBuy executes a buy order
-func (e *Engine) executeBuy(timestamp time.Time, price, quantity float64, reason string) error {
-	cost := price * quantity
-	fee := cost * e.commission
+func (e *Engine) executeBuy(intent OrderIntent) error {
+	cost := intent.Price * intent.Quantity
+	fee := e.feeModel.CalculateFee(intent)
 	totalCost := cost + fee
 
 	if totalCost > e.balance {
@@ -268,53 +330,53 @@ func (e *Engine) executeBuy(timestamp time.Time, price, quantity float64, reason
 	}
 
 	e.balance -= totalCost
-	e.position += quantity
+	e.position += intent.Quantity
 
 	trade := &Trade{
-		Timestamp: timestamp,
+		Timestamp: intent.Timestamp,
 		Side:      domain.OrderSideBuy,
-		Price:     price,
-		Quantity:  quantity,
+		Price:     intent.Price,
+		Quantity:  intent.Quantity,
 		Fee:       fee,
 		Balance:   e.balance,
 		Position:  e.position,
-		Reason:    reason,
+		Reason:    intent.Reason,
 	}
 	e.trades = append(e.trades, trade)
 
 	log.Printf("BUY: %.8f @ %.2f (Fee: %.2f) - Balance: %.2f, Position: %.8f - %s",
-		quantity, price, fee, e.balance, e.position, reason)
+		intent.Quantity, intent.Price, fee, e.balance, e.position, intent.Reason)
 
 	return nil
 }
 
 // executeSell executes a sell order
-func (e *Engine) executeSell(timestamp time.Time, price, quantity float64, reason string) error {
-	if quantity > e.position {
-		return fmt.Errorf("insufficient position: need %.8f, have %.8f", quantity, e.position)
+func (e *Engine) executeSell(intent OrderIntent) error {
+	if intent.Quantity > e.position {
+		return fmt.Errorf("insufficient position: need %.8f, have %.8f", intent.Quantity, e.position)
 	}
 
-	revenue := price * quantity
-	fee := revenue * e.commission
+	revenue := intent.Price * intent.Quantity
+	fee := e.feeModel.CalculateFee(intent)
 	netRevenue := revenue - fee
 
 	e.balance += netRevenue
-	e.position -= quantity
+	e.position -= intent.Quantity
 
 	trade := &Trade{
-		Timestamp: timestamp,
+		Timestamp: intent.Timestamp,
 		Side:      domain.OrderSideSell,
-		Price:     price,
-		Quantity:  quantity,
+		Price:     intent.Price,
+		Quantity:  intent.Quantity,
 		Fee:       fee,
 		Balance:   e.balance,
 		Position:  e.position,
-		Reason:    reason,
+		Reason:    intent.Reason,
 	}
 	e.trades = append(e.trades, trade)
 
 	log.Printf("SELL: %.8f @ %.2f (Fee: %.2f) - Balance: %.2f, Position: %.8f - %s",
-		quantity, price, fee, e.balance, e.position, reason)
+		intent.Quantity, intent.Price, fee, e.balance, e.position, intent.Reason)
 
 	return nil
 }
