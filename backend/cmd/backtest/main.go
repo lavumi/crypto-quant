@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"flag"
 	"log"
 	"time"
@@ -19,6 +18,7 @@ import (
 
 func main() {
 	// Command line flags
+	strategyName := flag.String("strategy", strategy.NameGoldenRSIBB, "Strategy to run")
 	symbol := flag.String("symbol", "BTCUSDT", "Trading symbol")
 	interval := flag.String("interval", "1h", "Candle interval (1m, 5m, 15m, 1h, 4h, 1d)")
 	startDate := flag.String("start", "", "Start date (YYYY-MM-DD)")
@@ -34,6 +34,8 @@ func main() {
 	rsiUpper := flag.Float64("rsi-upper", 70, "RSI upper bound")
 	bbPeriod := flag.Int("bb", 20, "Bollinger Bands period")
 	bbMult := flag.Float64("bb-mult", 2.0, "Bollinger Bands multiplier")
+	dcaPeriod := flag.String("dca-period", "24h", "DCA purchase interval")
+	dcaAmount := flag.Float64("dca-amount", 100, "DCA purchase amount in USDT")
 	volThresh := flag.Float64("vol-threshold", 1.3, "Volume spike threshold (x average)")
 	tp := flag.Float64("tp", 0.06, "Take profit percent (e.g., 0.06 = 6%)")
 	sl := flag.Float64("sl", 0.03, "Stop loss percent (e.g., 0.03 = 3%)")
@@ -126,51 +128,34 @@ func main() {
 		candles[0].OpenTime.Format("2006-01-02"),
 		candles[len(candles)-1].OpenTime.Format("2006-01-02"))
 
-	// Create strategy (GoldenRSIBB)
-	strat := strategy.NewCustomGoldenRSIBBStrategy(
-		*fastMA,
-		*slowMA,
-		*rsiPeriod,
-		*bbPeriod,
-		*rsiLower,
-		*rsiUpper,
-		*bbMult,
-		*volThresh,
-		*tp,
-		*sl,
-		*position,
-	)
-
-	// Build config JSON for persistence
-	type runConfig struct {
-		FastMA       int     `json:"fast"`
-		SlowMA       int     `json:"slow"`
-		RSIPeriod    int     `json:"rsi"`
-		RSILower     float64 `json:"rsi_lower"`
-		RSIUpper     float64 `json:"rsi_upper"`
-		BBPeriod     int     `json:"bb"`
-		BBMultiplier float64 `json:"bb_mult"`
-		VolThreshold float64 `json:"vol_threshold"`
-		TakeProfit   float64 `json:"tp"`
-		StopLoss     float64 `json:"sl"`
-		Position     float64 `json:"position"`
+	strategyConfig := strategy.Config{
+		Name:                  *strategyName,
+		FastPeriod:            *fastMA,
+		SlowPeriod:            *slowMA,
+		RSIPeriod:             *rsiPeriod,
+		RSIOversold:           *rsiLower,
+		RSIOverbought:         *rsiUpper,
+		BBPeriod:              *bbPeriod,
+		BBMultiplier:          *bbMult,
+		DCAPeriod:             *dcaPeriod,
+		DCAAmountUSDT:         *dcaAmount,
+		GoldenFastPeriod:      *fastMA,
+		GoldenSlowPeriod:      *slowMA,
+		GoldenRSIPeriod:       *rsiPeriod,
+		GoldenRSILowerBound:   *rsiLower,
+		GoldenRSIUpperBound:   *rsiUpper,
+		GoldenBBPeriod:        *bbPeriod,
+		GoldenBBMultiplier:    *bbMult,
+		GoldenVolumeThreshold: *volThresh,
+		GoldenTakeProfitPct:   *tp,
+		GoldenStopLossPct:     *sl,
+		PositionSize:          *position,
 	}
 
-	rc := runConfig{
-		FastMA:       *fastMA,
-		SlowMA:       *slowMA,
-		RSIPeriod:    *rsiPeriod,
-		RSILower:     *rsiLower,
-		RSIUpper:     *rsiUpper,
-		BBPeriod:     *bbPeriod,
-		BBMultiplier: *bbMult,
-		VolThreshold: *volThresh,
-		TakeProfit:   *tp,
-		StopLoss:     *sl,
-		Position:     *position,
+	strat, configJSON, err := strategy.Build(strategyConfig)
+	if err != nil {
+		log.Fatalf("Failed to build strategy: %v", err)
 	}
-
-	configJSON, _ := json.Marshal(rc)
 
 	// Create and run backtest engine
 	engine := backtest.NewEngine(&backtest.Config{
@@ -181,7 +166,7 @@ func main() {
 		DB:             db,
 		Symbol:         *symbol,
 		Interval:       *interval,
-		ConfigJSON:     string(configJSON),
+		ConfigJSON:     configJSON,
 	})
 
 	log.Printf("Running backtest with strategy: %s", strat.Name())
