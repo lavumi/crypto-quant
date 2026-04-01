@@ -67,10 +67,11 @@ func (s *DCAStrategy) OnCandle(ctx context.Context, candle *domain.Candle) (*bac
 		quantity := s.amountUSDT / candle.Close
 
 		return &backtest.Signal{
-			Action:   domain.OrderSideBuy,
-			Quantity: quantity,
-			Price:    0, // Market order
-			Reason:   fmt.Sprintf("DCA Initial Purchase: %.2f USDT @ %.2f", s.amountUSDT, candle.Close),
+			Action:       domain.OrderSideBuy,
+			Quantity:     quantity,
+			QuantityType: backtest.QuantityTypeAssetUnits,
+			Price:        0, // Market order
+			Reason:       fmt.Sprintf("DCA Initial Purchase: %.2f USDT @ %.2f", s.amountUSDT, candle.Close),
 		}, nil
 	}
 
@@ -84,10 +85,11 @@ func (s *DCAStrategy) OnCandle(ctx context.Context, candle *domain.Candle) (*bac
 		quantity := s.amountUSDT / candle.Close
 
 		return &backtest.Signal{
-			Action:   domain.OrderSideBuy,
-			Quantity: quantity,
-			Price:    0, // Market order
-			Reason:   fmt.Sprintf("DCA Regular Purchase: %.2f USDT @ %.2f", s.amountUSDT, candle.Close),
+			Action:       domain.OrderSideBuy,
+			Quantity:     quantity,
+			QuantityType: backtest.QuantityTypeAssetUnits,
+			Price:        0, // Market order
+			Reason:       fmt.Sprintf("DCA Regular Purchase: %.2f USDT @ %.2f", s.amountUSDT, candle.Close),
 		}, nil
 	}
 

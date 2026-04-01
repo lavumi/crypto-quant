@@ -3,21 +3,38 @@ package main
 import (
 	"context"
 	"flag"
+	"fmt"
 	"log"
+	"sort"
+	"strconv"
+	"strings"
 	"time"
 
 	binance "github.com/adshao/go-binance/v2"
 	"github.com/lavumi/crypto-quant/internal/datasource/database"
 	binanceExchange "github.com/lavumi/crypto-quant/internal/exchange/binance"
 	"github.com/lavumi/crypto-quant/internal/quant/backtest"
+	"github.com/lavumi/crypto-quant/internal/quant/optimize"
 	"github.com/lavumi/crypto-quant/internal/quant/strategy"
 	"github.com/lavumi/crypto-quant/internal/repository"
 	"github.com/lavumi/crypto-quant/internal/service/market"
 	"github.com/lavumi/crypto-quant/pkg/config"
 )
 
+type stringListFlag []string
+
+func (s *stringListFlag) String() string {
+	return strings.Join(*s, ",")
+}
+
+func (s *stringListFlag) Set(value string) error {
+	*s = append(*s, value)
+	return nil
+}
+
 func main() {
 	// Command line flags
+	mode := flag.String("mode", "single", "Execution mode: single or sweep")
 	strategyName := flag.String("strategy", strategy.NameGoldenRSIBB, "Strategy to run")
 	symbol := flag.String("symbol", "BTCUSDT", "Trading symbol")
 	interval := flag.String("interval", "1h", "Candle interval (1m, 5m, 15m, 1h, 4h, 1d)")
@@ -40,6 +57,10 @@ func main() {
 	tp := flag.Float64("tp", 0.06, "Take profit percent (e.g., 0.06 = 6%)")
 	sl := flag.Float64("sl", 0.03, "Stop loss percent (e.g., 0.03 = 3%)")
 	position := flag.Float64("position", 1.0, "Position size as fraction of balance (0.0-1.0)")
+	sweepSort := flag.String("sort", "sharpe", "Sweep sort metric: sharpe, return, calmar, profit_factor, win_rate, mdd")
+	sweepTop := flag.Int("top", 10, "Number of top sweep results to print")
+	var sweepParams stringListFlag
+	flag.Var(&sweepParams, "param", "Sweep parameter grid in the form key=v1,v2,v3 (repeatable)")
 
 	flag.Parse()
 
@@ -157,6 +178,35 @@ func main() {
 		log.Fatalf("Failed to build strategy: %v", err)
 	}
 
+	if *mode == "sweep" {
+		grid, err := parseSweepParams(sweepParams)
+		if err != nil {
+			log.Fatalf("Failed to parse sweep params: %v", err)
+		}
+		if len(grid) == 0 {
+			log.Fatalf("Sweep mode requires at least one --param key=v1,v2 argument")
+		}
+
+		results, err := optimize.RunSweep(ctx, candles, optimize.RunnerConfig{
+			InitialBalance: *balance,
+			Commission:     *commission,
+			Persist:        false,
+			Symbol:         *symbol,
+			Interval:       *interval,
+		}, optimize.SweepSpec{
+			BaseConfig: strategyConfig,
+			Parameters: grid,
+			SortBy:     *sweepSort,
+			Top:        *sweepTop,
+		})
+		if err != nil {
+			log.Fatalf("Sweep failed: %v", err)
+		}
+
+		printSweepResults(results, *sweepSort, *sweepTop, grid)
+		return
+	}
+
 	// Create and run backtest engine
 	engine := backtest.NewEngine(&backtest.Config{
 		InitialBalance: *balance,
@@ -201,4 +251,171 @@ func main() {
 	}
 
 	// Persistence is handled by engine when configured
+}
+
+func parseSweepParams(raw []string) (map[string][]string, error) {
+	params := make(map[string][]string)
+	for _, item := range raw {
+		parts := strings.SplitN(item, "=", 2)
+		if len(parts) != 2 {
+			return nil, fmt.Errorf("invalid sweep param %q, expected key=v1,v2", item)
+		}
+		key := strings.TrimSpace(parts[0])
+		if key == "" {
+			return nil, fmt.Errorf("invalid empty sweep param key in %q", item)
+		}
+
+		values := strings.Split(parts[1], ",")
+		clean := make([]string, 0, len(values))
+		for _, value := range values {
+			value = strings.TrimSpace(value)
+			if value != "" {
+				clean = append(clean, value)
+			}
+		}
+		if len(clean) == 0 {
+			return nil, fmt.Errorf("sweep param %q has no values", item)
+		}
+		params[key] = clean
+	}
+	return params, nil
+}
+
+func printSweepResults(results []optimize.SweepResult, sortBy string, top int, grid map[string][]string) {
+	summary := optimize.Summarize(results, sortBy)
+	log.Printf("Sweep complete: %d candidates (%d success, %d failed) ranked by %s",
+		summary.TotalCandidates, summary.SuccessfulRuns, summary.FailedRuns, summary.SortBy)
+
+	if summary.Best != nil {
+		log.Printf("Best   : %s", formatSweepSummaryLine(*summary.Best))
+	}
+	if summary.Median != nil {
+		log.Printf("Median : %s", formatSweepSummaryLine(*summary.Median))
+	}
+	if summary.Worst != nil {
+		log.Printf("Worst  : %s", formatSweepSummaryLine(*summary.Worst))
+	}
+
+	log.Printf("Top %d candidates:", min(top, len(results)))
+	log.Printf(" rank | params | return | sharpe | calmar | mdd | pf | trades ")
+
+	for idx, item := range limitResults(results, top) {
+		if item.Err != nil {
+			log.Printf(" %4d | ERROR | %v", idx+1, item.Err)
+			continue
+		}
+
+		log.Printf(
+			" %4d | %s | %7.2f%% | %6.2f | %6.2f | %6.2f%% | %4.2f | %6d",
+			idx+1,
+			formatSweepParams(item.Config, grid),
+			item.Result.TotalReturn*100,
+			item.Result.SharpeRatio,
+			item.Result.CalmarRatio,
+			item.Result.MaxDrawdownPct*100,
+			item.Result.ProfitFactor,
+			item.Result.TotalTrades,
+		)
+	}
+}
+
+func formatSweepSummaryLine(item optimize.SweepResult) string {
+	if item.Result == nil {
+		return "n/a"
+	}
+
+	return fmt.Sprintf(
+		"return=%.2f%% sharpe=%.2f calmar=%.2f mdd=%.2f%% pf=%.2f trades=%d",
+		item.Result.TotalReturn*100,
+		item.Result.SharpeRatio,
+		item.Result.CalmarRatio,
+		item.Result.MaxDrawdownPct*100,
+		item.Result.ProfitFactor,
+		item.Result.TotalTrades,
+	)
+}
+
+func formatSweepParams(cfg strategy.Config, grid map[string][]string) string {
+	keys := make([]string, 0, len(grid))
+	for key := range grid {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+
+	parts := make([]string, 0, len(keys))
+	for _, key := range keys {
+		if value, ok := sweepParamValue(cfg, key); ok {
+			parts = append(parts, key+"="+value)
+		}
+	}
+
+	if len(parts) == 0 {
+		return cfg.Name
+	}
+	return strings.Join(parts, ",")
+}
+
+func sweepParamValue(cfg strategy.Config, key string) (string, bool) {
+	switch strings.ToLower(strings.TrimSpace(key)) {
+	case "fast", "fast_period":
+		return strconv.Itoa(cfg.FastPeriod), true
+	case "slow", "slow_period":
+		return strconv.Itoa(cfg.SlowPeriod), true
+	case "rsi", "rsi_period":
+		return strconv.Itoa(cfg.RSIPeriod), true
+	case "rsi_lower", "rsi_oversold":
+		return formatSweepFloat(cfg.RSIOversold), true
+	case "rsi_upper", "rsi_overbought":
+		return formatSweepFloat(cfg.RSIOverbought), true
+	case "bb", "bb_period":
+		return strconv.Itoa(cfg.BBPeriod), true
+	case "bb_mult", "bb_multiplier":
+		return formatSweepFloat(cfg.BBMultiplier), true
+	case "dca_period":
+		return cfg.DCAPeriod, true
+	case "dca_amount", "dca_amount_usdt":
+		return formatSweepFloat(cfg.DCAAmountUSDT), true
+	case "golden_fast", "golden_fast_period":
+		return strconv.Itoa(cfg.GoldenFastPeriod), true
+	case "golden_slow", "golden_slow_period":
+		return strconv.Itoa(cfg.GoldenSlowPeriod), true
+	case "golden_rsi", "golden_rsi_period":
+		return strconv.Itoa(cfg.GoldenRSIPeriod), true
+	case "golden_rsi_lower", "golden_rsi_lower_bound":
+		return formatSweepFloat(cfg.GoldenRSILowerBound), true
+	case "golden_rsi_upper", "golden_rsi_upper_bound":
+		return formatSweepFloat(cfg.GoldenRSIUpperBound), true
+	case "golden_bb", "golden_bb_period":
+		return strconv.Itoa(cfg.GoldenBBPeriod), true
+	case "golden_bb_mult", "golden_bb_multiplier":
+		return formatSweepFloat(cfg.GoldenBBMultiplier), true
+	case "vol_threshold", "golden_volume_threshold":
+		return formatSweepFloat(cfg.GoldenVolumeThreshold), true
+	case "tp", "golden_take_profit_pct":
+		return formatSweepFloat(cfg.GoldenTakeProfitPct), true
+	case "sl", "golden_stop_loss_pct":
+		return formatSweepFloat(cfg.GoldenStopLossPct), true
+	case "position", "position_size":
+		return formatSweepFloat(cfg.PositionSize), true
+	default:
+		return "", false
+	}
+}
+
+func formatSweepFloat(value float64) string {
+	return strconv.FormatFloat(value, 'f', -1, 64)
+}
+
+func limitResults(results []optimize.SweepResult, top int) []optimize.SweepResult {
+	if top <= 0 || top >= len(results) {
+		return results
+	}
+	return results[:top]
+}
+
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }

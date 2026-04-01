@@ -17,6 +17,16 @@ type OrderIntent struct {
 	Reason    string
 }
 
+// QuantityType controls how a signal quantity should be interpreted.
+type QuantityType string
+
+const (
+	// QuantityTypeFraction means Quantity is a portfolio fraction (0..1).
+	QuantityTypeFraction QuantityType = "fraction"
+	// QuantityTypeAssetUnits means Quantity is an explicit asset quantity.
+	QuantityTypeAssetUnits QuantityType = "asset_units"
+)
+
 // PortfolioState is the current account snapshot used by execution models.
 type PortfolioState struct {
 	Balance  float64

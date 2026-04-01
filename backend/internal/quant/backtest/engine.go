@@ -25,10 +25,11 @@ type Strategy interface {
 
 // Signal represents a trading signal
 type Signal struct {
-	Action   domain.OrderSide // BUY or SELL
-	Quantity float64          // Position size as percentage (0.0 - 1.0, e.g., 0.5 = 50% of balance/position)
-	Price    float64          // Limit price (0 for market order)
-	Reason   string           // Reason for the signal
+	Action       domain.OrderSide // BUY or SELL
+	Quantity     float64          // Requested size, interpreted by QuantityType
+	QuantityType QuantityType     // Defaults to QuantityTypeFraction when empty
+	Price        float64          // Limit price (0 for market order)
+	Reason       string           // Reason for the signal
 }
 
 // Engine executes backtesting
@@ -260,31 +261,13 @@ func (e *Engine) executeSignal(candle *domain.Candle, signal *Signal) error {
 		price = candle.Close // Market order uses close price
 	}
 
-	// Convert percentage to actual quantity
-	var actualQuantity float64
-	switch signal.Action {
-	case domain.OrderSideBuy:
-		// For buy: use percentage of available balance
-		// Calculate how many coins we can buy with (balance * percentage)
-		availableAmount := e.balance*signal.Quantity - 1
-		// Truncate to 2 decimal places to prevent floating point errors
-		availableAmount = math.Floor(availableAmount*100) / 100
-		if availableAmount <= 0 {
-			return fmt.Errorf("insufficient balance allocated for buy: %.2f", availableAmount)
-		}
-		actualQuantity = availableAmount / price
-	case domain.OrderSideSell:
-		// For sell: use percentage of current position
-		actualQuantity = e.position * signal.Quantity
-		if signal.Quantity <= 0 || signal.Quantity > 1 {
-			actualQuantity = e.position
-		}
-	default:
-		return fmt.Errorf("unknown order side: %s", signal.Action)
+	actualQuantity, err := e.resolveOrderQuantity(price, signal)
+	if err != nil {
+		return err
 	}
 
 	if actualQuantity <= 0 {
-		return fmt.Errorf("non-positive order quantity: %.8f", actualQuantity)
+		return nil
 	}
 
 	intent := OrderIntent{
@@ -317,6 +300,78 @@ func (e *Engine) executeSignal(candle *domain.Candle, signal *Signal) error {
 	default:
 		return fmt.Errorf("unknown order side: %s", intent.Side)
 	}
+}
+
+func (e *Engine) resolveOrderQuantity(price float64, signal *Signal) (float64, error) {
+	quantityType := signal.QuantityType
+	if quantityType == "" {
+		quantityType = QuantityTypeFraction
+	}
+
+	switch quantityType {
+	case QuantityTypeAssetUnits:
+		if signal.Quantity < 0 {
+			return 0, fmt.Errorf("negative asset quantity: %.8f", signal.Quantity)
+		}
+		return signal.Quantity, nil
+
+	case QuantityTypeFraction:
+		switch signal.Action {
+		case domain.OrderSideBuy:
+			if signal.Quantity <= 0 {
+				return 0, nil
+			}
+			budget := e.balance * math.Min(signal.Quantity, 1)
+			return e.affordableQuantity(price, budget), nil
+
+		case domain.OrderSideSell:
+			if e.position <= 0 || signal.Quantity <= 0 {
+				return 0, nil
+			}
+			if signal.Quantity >= 1 {
+				return e.position, nil
+			}
+			return e.position * signal.Quantity, nil
+
+		default:
+			return 0, fmt.Errorf("unknown order side: %s", signal.Action)
+		}
+
+	default:
+		return 0, fmt.Errorf("unknown quantity type: %s", quantityType)
+	}
+}
+
+func (e *Engine) affordableQuantity(price, budget float64) float64 {
+	if price <= 0 || budget <= 0 {
+		return 0
+	}
+
+	quantity := budget / price
+	for range 5 {
+		intent := OrderIntent{
+			Side:     domain.OrderSideBuy,
+			Price:    price,
+			Quantity: quantity,
+		}
+		totalCost := price*quantity + e.feeModel.CalculateFee(intent)
+		if totalCost <= budget {
+			return quantity
+		}
+		quantity *= budget / totalCost
+	}
+
+	intent := OrderIntent{
+		Side:     domain.OrderSideBuy,
+		Price:    price,
+		Quantity: quantity,
+	}
+	totalCost := price*quantity + e.feeModel.CalculateFee(intent)
+	if totalCost > budget {
+		return 0
+	}
+
+	return quantity
 }
 
 // executeBuy executes a buy order
