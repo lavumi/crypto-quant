@@ -207,6 +207,22 @@ func main() {
 			log.Fatalf("Sweep failed: %v", err)
 		}
 
+		sweepID, err := optimize.PersistSweep(ctx, db, optimize.RunnerConfig{
+			InitialBalance: *balance,
+			Commission:     *commission,
+			Symbol:         *symbol,
+			Interval:       *interval,
+		}, optimize.SweepSpec{
+			BaseConfig: strategyConfig,
+			Parameters: grid,
+			SortBy:     *sweepSort,
+		}, results)
+		if err != nil {
+			log.Printf("Failed to persist sweep results: %v", err)
+		} else {
+			log.Printf("Persisted sweep run: id=%d", sweepID)
+		}
+
 		printSweepResults(results, *sweepSort, *sweepTop, grid)
 		return
 	}
@@ -240,6 +256,29 @@ func main() {
 		})
 		if err != nil {
 			log.Fatalf("Walk-forward failed: %v", err)
+		}
+
+		walkForwardID, err := optimize.PersistWalkForward(ctx, db, optimize.RunnerConfig{
+			InitialBalance: *balance,
+			Commission:     *commission,
+			Symbol:         *symbol,
+			Interval:       *interval,
+		}, optimize.WalkForwardSpec{
+			SweepSpec: optimize.SweepSpec{
+				BaseConfig: strategyConfig,
+				Parameters: grid,
+				SortBy:     *sweepSort,
+			},
+			TrainDuration:   time.Duration(*trainDays) * 24 * time.Hour,
+			TestDuration:    time.Duration(*testDays) * 24 * time.Hour,
+			StepDuration:    time.Duration(*stepDays) * 24 * time.Hour,
+			MaxWindows:      *maxWindows,
+			SelectionMetric: *sweepSort,
+		}, summary)
+		if err != nil {
+			log.Printf("Failed to persist walk-forward results: %v", err)
+		} else {
+			log.Printf("Persisted walk-forward run: id=%d", walkForwardID)
 		}
 
 		printWalkForwardSummary(summary, *sweepTop, grid)
