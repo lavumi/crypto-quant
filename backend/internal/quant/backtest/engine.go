@@ -7,6 +7,7 @@ import (
 	"math"
 	"time"
 
+	"github.com/lavumi/crypto-quant/internal/datasource/database"
 	"github.com/lavumi/crypto-quant/internal/domain"
 )
 
@@ -35,6 +36,13 @@ type Engine struct {
 	strategy       Strategy
 	initialBalance float64
 	commission     float64 // Commission rate (e.g., 0.001 for 0.1%)
+
+	// Persistence
+	persist    bool
+	db         *database.DB
+	symbol     string
+	interval   string
+	configJSON string
 
 	// State
 	balance  float64
@@ -67,6 +75,12 @@ type Config struct {
 	InitialBalance float64
 	Commission     float64
 	Strategy       Strategy
+	// Optional persistence settings
+	Persist    bool
+	DB         *database.DB
+	Symbol     string
+	Interval   string
+	ConfigJSON string
 }
 
 // NewEngine creates a new backtesting engine
@@ -75,6 +89,11 @@ func NewEngine(cfg *Config) *Engine {
 		strategy:       cfg.Strategy,
 		initialBalance: cfg.InitialBalance,
 		commission:     cfg.Commission,
+		persist:        cfg.Persist,
+		db:             cfg.DB,
+		symbol:         cfg.Symbol,
+		interval:       cfg.Interval,
+		configJSON:     cfg.ConfigJSON,
 		balance:        cfg.InitialBalance,
 		position:       0,
 		trades:         make([]*Trade, 0),
@@ -122,7 +141,92 @@ func (e *Engine) Run(ctx context.Context, candles []*domain.Candle) (*Result, er
 	log.Printf("Backtest complete: Final equity: %.2f, Total return: %.2f%%",
 		result.FinalEquity, result.TotalReturn*100)
 
+	// Persist if configured
+	if e.persist && e.db != nil {
+		if err := e.persistRun(ctx, result); err != nil {
+			log.Printf("Failed to persist backtest run: %v", err)
+		}
+	}
+
 	return result, nil
+}
+
+// persistRun saves run summary, trades, and equity curve into DB
+func (e *Engine) persistRun(ctx context.Context, result *Result) error {
+	tx, err := e.db.Beginx()
+	if err != nil {
+		return fmt.Errorf("begin tx: %w", err)
+	}
+
+	res, err := tx.Exec(`
+        INSERT INTO backtest_runs (
+            strategy_name, symbol, interval, start_time, end_time,
+            initial_balance, final_equity, total_return, sharpe_ratio, max_drawdown,
+            max_drawdown_pct, win_rate, total_trades, commission, config_json
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `,
+		e.strategy.Name(), e.symbol, e.interval,
+		result.StartTime.Unix(), result.EndTime.Unix(),
+		e.initialBalance, result.FinalEquity, result.TotalReturn, result.SharpeRatio, result.MaxDrawdown,
+		result.MaxDrawdownPct, result.WinRate, result.TotalTrades, e.commission, e.configJSON,
+	)
+	if err != nil {
+		tx.Rollback()
+		return fmt.Errorf("insert run: %w", err)
+	}
+
+	runID, err := res.LastInsertId()
+	if err != nil {
+		tx.Rollback()
+		return fmt.Errorf("last insert id: %w", err)
+	}
+
+	if len(e.trades) > 0 {
+		stmtTrades, err := tx.Prepare(`
+            INSERT INTO backtest_run_trades (
+                run_id, timestamp, side, price, quantity, fee, balance, position, reason
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `)
+		if err != nil {
+			tx.Rollback()
+			return fmt.Errorf("prepare trades: %w", err)
+		}
+		for _, tr := range e.trades {
+			if _, err := stmtTrades.Exec(runID, tr.Timestamp.Unix(), string(tr.Side), tr.Price, tr.Quantity, tr.Fee, tr.Balance, tr.Position, tr.Reason); err != nil {
+				stmtTrades.Close()
+				tx.Rollback()
+				return fmt.Errorf("insert trade: %w", err)
+			}
+		}
+		stmtTrades.Close()
+	}
+
+	if len(e.equity) > 0 {
+		stmtEquity, err := tx.Prepare(`
+            INSERT INTO backtest_run_equity (
+                run_id, timestamp, equity, price
+            ) VALUES (?, ?, ?, ?)
+        `)
+		if err != nil {
+			tx.Rollback()
+			return fmt.Errorf("prepare equity: %w", err)
+		}
+		for _, pt := range e.equity {
+			if _, err := stmtEquity.Exec(runID, pt.Timestamp.Unix(), pt.Equity, pt.Price); err != nil {
+				stmtEquity.Close()
+				tx.Rollback()
+				return fmt.Errorf("insert equity: %w", err)
+			}
+		}
+		stmtEquity.Close()
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit: %w", err)
+	}
+
+	log.Printf("Saved backtest run: id=%d, strategy=%s, symbol=%s, interval=%s", runID, e.strategy.Name(), e.symbol, e.interval)
+	return nil
 }
 
 // executeSignal executes a trading signal

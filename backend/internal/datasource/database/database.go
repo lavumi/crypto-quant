@@ -116,6 +116,59 @@ func (db *DB) Migrate() error {
 			ON backtest_results(strategy_name, created_at DESC)`,
 	)
 
+	// Backtest run tables (normalized)
+	migrations = append(migrations,
+		`CREATE TABLE IF NOT EXISTS backtest_runs (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			strategy_name TEXT NOT NULL,
+			symbol TEXT NOT NULL,
+			interval TEXT NOT NULL,
+			start_time INTEGER NOT NULL,
+			end_time INTEGER NOT NULL,
+			initial_balance REAL NOT NULL,
+			final_equity REAL NOT NULL,
+			total_return REAL NOT NULL,
+			sharpe_ratio REAL,
+			max_drawdown REAL,
+			max_drawdown_pct REAL,
+			win_rate REAL,
+			total_trades INTEGER NOT NULL,
+			commission REAL NOT NULL,
+			config_json TEXT,
+			notes TEXT,
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_backtest_runs_lookup
+			ON backtest_runs(strategy_name, symbol, interval, created_at DESC)`,
+		`CREATE TABLE IF NOT EXISTS backtest_run_trades (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			run_id INTEGER NOT NULL,
+			timestamp INTEGER NOT NULL,
+			side TEXT NOT NULL,
+			price REAL NOT NULL,
+			quantity REAL NOT NULL,
+			fee REAL NOT NULL,
+			balance REAL NOT NULL,
+			position REAL NOT NULL,
+			reason TEXT,
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			FOREIGN KEY (run_id) REFERENCES backtest_runs(id) ON DELETE CASCADE
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_backtest_run_trades_run_time
+			ON backtest_run_trades(run_id, timestamp)`,
+		`CREATE TABLE IF NOT EXISTS backtest_run_equity (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			run_id INTEGER NOT NULL,
+			timestamp INTEGER NOT NULL,
+			equity REAL NOT NULL,
+			price REAL NOT NULL,
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			FOREIGN KEY (run_id) REFERENCES backtest_runs(id) ON DELETE CASCADE
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_backtest_run_equity_run_time
+			ON backtest_run_equity(run_id, timestamp)`,
+	)
+
 	for i, migration := range migrations {
 		if _, err := db.Exec(migration); err != nil {
 			return fmt.Errorf("migration %d failed: %w", i, err)

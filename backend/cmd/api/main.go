@@ -14,11 +14,11 @@ import (
 	"github.com/lavumi/crypto-quant/internal/api"
 	"github.com/lavumi/crypto-quant/internal/api/handler"
 	"github.com/lavumi/crypto-quant/internal/datasource/database"
-	"github.com/lavumi/crypto-quant/internal/datasource/exchange"
-	"github.com/lavumi/crypto-quant/internal/datasource/market/history"
-	"github.com/lavumi/crypto-quant/internal/datasource/market/price"
+	binanceExchange "github.com/lavumi/crypto-quant/internal/exchange/binance"
 	"github.com/lavumi/crypto-quant/internal/portfolio"
 	"github.com/lavumi/crypto-quant/internal/portfolio/wallet"
+	"github.com/lavumi/crypto-quant/internal/repository"
+	"github.com/lavumi/crypto-quant/internal/service/market"
 
 	_ "github.com/lavumi/crypto-quant/docs"
 )
@@ -138,13 +138,13 @@ EXAMPLES:
 	}
 
 	// Initialize repositories
-	candleRepo := history.NewCandleRepository(db)
-	tradeRepo := history.NewTradeRepository(db)
+	candleRepo := repository.NewCandleRepository(db)
+	tradeRepo := repository.NewTradeRepository(db)
 
-	// Initialize Binance client
-	var binanceExchange *exchange.BinanceExchange
+	// Initialize Binance exchange
+	var exchange *binanceExchange.Exchange
 	if *apiKey != "" && *secretKey != "" {
-		binanceExchange, err = exchange.NewBinanceExchange(*apiKey, *secretKey, *useTestnet)
+		exchange, err = binanceExchange.New(*apiKey, *secretKey, *useTestnet)
 		if err != nil {
 			log.Fatalf("Failed to initialize Binance exchange: %v", err)
 		}
@@ -153,16 +153,12 @@ EXAMPLES:
 		if *useTestnet {
 			binance.UseTestnet = true
 		}
-		binanceExchange = &exchange.BinanceExchange{}
-		binanceExchange.SetClient(binance.NewClient("", ""))
+		exchange, _ = binanceExchange.New("", "", *useTestnet)
+		exchange.SetClient(binance.NewClient("", ""))
 	}
 
-	// Initialize Binance REST client for data collection
-	var binanceClient *binance.Client
-	if *useTestnet {
-		binance.UseTestnet = true
-	}
-	binanceClient = binance.NewClient(*apiKey, *secretKey)
+	// Set collector for historical data
+	exchange.SetCollector(candleRepo)
 
 	// Initialize wallet (virtual trading)
 	initialBalances := map[string]float64{
@@ -174,17 +170,17 @@ EXAMPLES:
 	portfolioManager := portfolio.NewManager()
 
 	// Initialize services
-	marketService := price.NewService(binanceExchange)
-	dataService := history.NewService(candleRepo, tradeRepo, binanceClient)
+	priceService := market.NewPriceService(exchange)
+	historyService := market.NewHistoryService(candleRepo, tradeRepo, exchange)
 	walletService := wallet.NewService(walletManager)
-	portfolioService := portfolio.NewService(portfolioManager, binanceExchange)
+	portfolioService := portfolio.NewService(portfolioManager, exchange)
 
 	// Initialize handlers
-	marketHandler := handler.NewMarketHandler(marketService)
-	dataHandler := handler.NewDataHandler(dataService)
+	marketHandler := handler.NewMarketHandler(priceService)
+	dataHandler := handler.NewDataHandler(historyService)
 	walletHandler := handler.NewWalletHandler(walletService)
 	portfolioHandler := handler.NewPortfolioHandler(portfolioService)
-	backtestHandler := handler.NewBacktestHandler(dataService)
+	backtestHandler := handler.NewBacktestHandler(historyService)
 
 	// Setup router
 	r := api.SetupRouter(marketHandler, dataHandler, walletHandler, portfolioHandler, backtestHandler)
@@ -235,9 +231,11 @@ func runCollector(dbPath, symbol, interval string, days int, startDate, endDate 
 	// Initialize Binance client (no API key needed for public data)
 	client := binance.NewClient("", "")
 
+	// Initialize repositories
+	candleRepo := repository.NewCandleRepository(db)
+
 	// Initialize collector
-	candleRepo := history.NewCandleRepository(db)
-	col := history.NewCollector(client, candleRepo)
+	col := binanceExchange.NewCollector(client, candleRepo)
 
 	// Calculate time range
 	var startTime, endTime time.Time

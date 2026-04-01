@@ -5,16 +5,16 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/lavumi/crypto-quant/internal/api/response"
-	"github.com/lavumi/crypto-quant/internal/datasource/market/price"
+	"github.com/lavumi/crypto-quant/internal/service/market"
 )
 
 // MarketHandler handles market-related requests
 type MarketHandler struct {
-	marketService *price.Service
+	marketService *market.PriceService
 }
 
 // NewMarketHandler creates a new market handler
-func NewMarketHandler(marketService *price.Service) *MarketHandler {
+func NewMarketHandler(marketService *market.PriceService) *MarketHandler {
 	return &MarketHandler{
 		marketService: marketService,
 	}

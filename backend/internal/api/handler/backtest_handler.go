@@ -8,18 +8,18 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/lavumi/crypto-quant/internal/api/response"
-	"github.com/lavumi/crypto-quant/internal/datasource/market/history"
 	"github.com/lavumi/crypto-quant/internal/quant/backtest"
 	"github.com/lavumi/crypto-quant/internal/quant/strategy"
+	"github.com/lavumi/crypto-quant/internal/service/market"
 )
 
 // BacktestHandler handles backtest API requests
 type BacktestHandler struct {
-	historyService *history.Service
+	historyService *market.HistoryService
 }
 
 // NewBacktestHandler creates a new backtest handler
-func NewBacktestHandler(historyService *history.Service) *BacktestHandler {
+func NewBacktestHandler(historyService *market.HistoryService) *BacktestHandler {
 	return &BacktestHandler{
 		historyService: historyService,
 	}

@@ -5,16 +5,16 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/lavumi/crypto-quant/internal/api/response"
-	"github.com/lavumi/crypto-quant/internal/datasource/market/history"
+	"github.com/lavumi/crypto-quant/internal/service/market"
 )
 
 // DataHandler handles historical data requests
 type DataHandler struct {
-	dataService *history.Service
+	dataService *market.HistoryService
 }
 
 // NewDataHandler creates a new data handler
-func NewDataHandler(dataService *history.Service) *DataHandler {
+func NewDataHandler(dataService *market.HistoryService) *DataHandler {
 	return &DataHandler{
 		dataService: dataService,
 	}

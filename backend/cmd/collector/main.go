@@ -8,7 +8,8 @@ import (
 
 	binance "github.com/adshao/go-binance/v2"
 	"github.com/lavumi/crypto-quant/internal/datasource/database"
-	"github.com/lavumi/crypto-quant/internal/datasource/market/history"
+	binanceExchange "github.com/lavumi/crypto-quant/internal/exchange/binance"
+	"github.com/lavumi/crypto-quant/internal/repository"
 )
 
 func main() {
@@ -42,9 +43,11 @@ func main() {
 	// Initialize Binance client (no API key needed for public data)
 	client := binance.NewClient("", "")
 
+	// Initialize repository
+	candleRepo := repository.NewCandleRepository(db)
+
 	// Initialize collector
-	candleRepo := history.NewCandleRepository(db)
-	col := history.NewCollector(client, candleRepo)
+	col := binanceExchange.NewCollector(client, candleRepo)
 
 	// Calculate time range
 	var startTime, endTime time.Time

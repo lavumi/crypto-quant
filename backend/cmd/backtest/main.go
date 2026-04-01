@@ -2,15 +2,18 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"flag"
 	"log"
 	"time"
 
 	binance "github.com/adshao/go-binance/v2"
-	"github.com/lavumi/crypto-quant/internal/quant/backtest"
 	"github.com/lavumi/crypto-quant/internal/datasource/database"
-	"github.com/lavumi/crypto-quant/internal/datasource/market/history"
+	binanceExchange "github.com/lavumi/crypto-quant/internal/exchange/binance"
+	"github.com/lavumi/crypto-quant/internal/quant/backtest"
 	"github.com/lavumi/crypto-quant/internal/quant/strategy"
+	"github.com/lavumi/crypto-quant/internal/repository"
+	"github.com/lavumi/crypto-quant/internal/service/market"
 	"github.com/lavumi/crypto-quant/pkg/config"
 )
 
@@ -23,9 +26,18 @@ func main() {
 	balance := flag.Float64("balance", 10000.0, "Initial balance")
 	commission := flag.Float64("commission", 0.001, "Commission rate (default: 0.1%)")
 
-	// Strategy parameters
-	fastMA := flag.Int("fast", 10, "Fast MA period")
-	slowMA := flag.Int("slow", 30, "Slow MA period")
+	// Strategy parameters (GoldenRSIBB)
+	fastMA := flag.Int("fast", 5, "Fast MA period (e.g., 5)")
+	slowMA := flag.Int("slow", 20, "Slow MA period (e.g., 20)")
+	rsiPeriod := flag.Int("rsi", 14, "RSI period")
+	rsiLower := flag.Float64("rsi-lower", 40, "RSI lower bound")
+	rsiUpper := flag.Float64("rsi-upper", 70, "RSI upper bound")
+	bbPeriod := flag.Int("bb", 20, "Bollinger Bands period")
+	bbMult := flag.Float64("bb-mult", 2.0, "Bollinger Bands multiplier")
+	volThresh := flag.Float64("vol-threshold", 1.3, "Volume spike threshold (x average)")
+	tp := flag.Float64("tp", 0.06, "Take profit percent (e.g., 0.06 = 6%)")
+	sl := flag.Float64("sl", 0.03, "Stop loss percent (e.g., 0.03 = 3%)")
+	position := flag.Float64("position", 1.0, "Position size as fraction of balance (0.0-1.0)")
 
 	flag.Parse()
 
@@ -74,10 +86,15 @@ func main() {
 	// Initialize Binance client
 	binanceClient := binance.NewClient(cfg.Exchange.Binance.APIKey, cfg.Exchange.Binance.SecretKey)
 
-	// Initialize repositories and services
-	candleRepo := history.NewCandleRepository(db)
-	tradeRepo := history.NewTradeRepository(db)
-	historyService := history.NewService(candleRepo, tradeRepo, binanceClient)
+	// Initialize repositories
+	candleRepo := repository.NewCandleRepository(db)
+	tradeRepo := repository.NewTradeRepository(db)
+
+	// Initialize collector and exchange
+	collector := binanceExchange.NewCollector(binanceClient, candleRepo)
+
+	// Initialize service
+	historyService := market.NewHistoryService(candleRepo, tradeRepo, collector)
 
 	ctx := context.Background()
 
@@ -109,14 +126,62 @@ func main() {
 		candles[0].OpenTime.Format("2006-01-02"),
 		candles[len(candles)-1].OpenTime.Format("2006-01-02"))
 
-	// Create strategy
-	strat := strategy.NewMACrossStrategy(*fastMA, *slowMA)
+	// Create strategy (GoldenRSIBB)
+	strat := strategy.NewCustomGoldenRSIBBStrategy(
+		*fastMA,
+		*slowMA,
+		*rsiPeriod,
+		*bbPeriod,
+		*rsiLower,
+		*rsiUpper,
+		*bbMult,
+		*volThresh,
+		*tp,
+		*sl,
+		*position,
+	)
+
+	// Build config JSON for persistence
+	type runConfig struct {
+		FastMA       int     `json:"fast"`
+		SlowMA       int     `json:"slow"`
+		RSIPeriod    int     `json:"rsi"`
+		RSILower     float64 `json:"rsi_lower"`
+		RSIUpper     float64 `json:"rsi_upper"`
+		BBPeriod     int     `json:"bb"`
+		BBMultiplier float64 `json:"bb_mult"`
+		VolThreshold float64 `json:"vol_threshold"`
+		TakeProfit   float64 `json:"tp"`
+		StopLoss     float64 `json:"sl"`
+		Position     float64 `json:"position"`
+	}
+
+	rc := runConfig{
+		FastMA:       *fastMA,
+		SlowMA:       *slowMA,
+		RSIPeriod:    *rsiPeriod,
+		RSILower:     *rsiLower,
+		RSIUpper:     *rsiUpper,
+		BBPeriod:     *bbPeriod,
+		BBMultiplier: *bbMult,
+		VolThreshold: *volThresh,
+		TakeProfit:   *tp,
+		StopLoss:     *sl,
+		Position:     *position,
+	}
+
+	configJSON, _ := json.Marshal(rc)
 
 	// Create and run backtest engine
 	engine := backtest.NewEngine(&backtest.Config{
 		InitialBalance: *balance,
 		Commission:     *commission,
 		Strategy:       strat,
+		Persist:        true,
+		DB:             db,
+		Symbol:         *symbol,
+		Interval:       *interval,
+		ConfigJSON:     string(configJSON),
 	})
 
 	log.Printf("Running backtest with strategy: %s", strat.Name())
@@ -149,4 +214,6 @@ func main() {
 			log.Printf("  ... and %d more trades", len(result.Trades)-10)
 		}
 	}
+
+	// Persistence is handled by engine when configured
 }

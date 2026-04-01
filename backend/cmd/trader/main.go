@@ -10,8 +10,9 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/lavumi/crypto-quant/internal/datasource/exchange"
 	"github.com/lavumi/crypto-quant/internal/domain"
+	binanceExchange "github.com/lavumi/crypto-quant/internal/exchange/binance"
+	virtualExchange "github.com/lavumi/crypto-quant/internal/exchange/virtual"
 	"github.com/lavumi/crypto-quant/pkg/config"
 )
 
@@ -32,12 +33,12 @@ func main() {
 
 	switch cfg.Exchange.Type {
 	case "virtual":
-		ex = exchange.NewVirtualExchange(cfg.Exchange.InitialPrices)
+		ex = virtualExchange.New(cfg.Exchange.InitialPrices)
 		log.Println("Virtual exchange initialized")
 	case "binance":
 		// API keys are optional for public data (price queries)
 		// Only required for private operations (trading, balance checks)
-		ex, err2 = exchange.NewBinanceExchange(
+		ex, err2 = binanceExchange.New(
 			cfg.Exchange.Binance.APIKey,
 			cfg.Exchange.Binance.SecretKey,
 			cfg.Exchange.Binance.UseTestnet,
