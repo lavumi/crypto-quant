@@ -34,7 +34,7 @@ func (s *stringListFlag) Set(value string) error {
 
 func main() {
 	// Command line flags
-	mode := flag.String("mode", "single", "Execution mode: single or sweep")
+	mode := flag.String("mode", "single", "Execution mode: single, sweep, or walk-forward")
 	strategyName := flag.String("strategy", strategy.NameGoldenRSIBB, "Strategy to run")
 	symbol := flag.String("symbol", "BTCUSDT", "Trading symbol")
 	interval := flag.String("interval", "1h", "Candle interval (1m, 5m, 15m, 1h, 4h, 1d)")
@@ -59,6 +59,10 @@ func main() {
 	position := flag.Float64("position", 1.0, "Position size as fraction of balance (0.0-1.0)")
 	sweepSort := flag.String("sort", "sharpe", "Sweep sort metric: sharpe, return, calmar, profit_factor, win_rate, mdd")
 	sweepTop := flag.Int("top", 10, "Number of top sweep results to print")
+	trainDays := flag.Int("train-days", 180, "Walk-forward training window in days")
+	testDays := flag.Int("test-days", 60, "Walk-forward test window in days")
+	stepDays := flag.Int("step-days", 60, "Walk-forward step size in days")
+	maxWindows := flag.Int("max-windows", 0, "Maximum walk-forward windows to evaluate (0 = all)")
 	var sweepParams stringListFlag
 	flag.Var(&sweepParams, "param", "Sweep parameter grid in the form key=v1,v2,v3 (repeatable)")
 
@@ -204,6 +208,41 @@ func main() {
 		}
 
 		printSweepResults(results, *sweepSort, *sweepTop, grid)
+		return
+	}
+
+	if *mode == "walk-forward" {
+		grid, err := parseSweepParams(sweepParams)
+		if err != nil {
+			log.Fatalf("Failed to parse sweep params: %v", err)
+		}
+		if len(grid) == 0 {
+			log.Fatalf("Walk-forward mode requires at least one --param key=v1,v2 argument")
+		}
+
+		summary, err := optimize.RunWalkForward(ctx, candles, optimize.RunnerConfig{
+			InitialBalance: *balance,
+			Commission:     *commission,
+			Persist:        false,
+			Symbol:         *symbol,
+			Interval:       *interval,
+		}, optimize.WalkForwardSpec{
+			SweepSpec: optimize.SweepSpec{
+				BaseConfig: strategyConfig,
+				Parameters: grid,
+				SortBy:     *sweepSort,
+			},
+			TrainDuration:   time.Duration(*trainDays) * 24 * time.Hour,
+			TestDuration:    time.Duration(*testDays) * 24 * time.Hour,
+			StepDuration:    time.Duration(*stepDays) * 24 * time.Hour,
+			MaxWindows:      *maxWindows,
+			SelectionMetric: *sweepSort,
+		})
+		if err != nil {
+			log.Fatalf("Walk-forward failed: %v", err)
+		}
+
+		printWalkForwardSummary(summary, *sweepTop, grid)
 		return
 	}
 
@@ -418,4 +457,56 @@ func min(a, b int) int {
 		return a
 	}
 	return b
+}
+
+func printWalkForwardSummary(summary *optimize.WalkForwardSummary, top int, grid map[string][]string) {
+	if summary == nil {
+		log.Printf("Walk-forward summary unavailable")
+		return
+	}
+
+	log.Printf("Walk-forward complete: %d windows evaluated using %s", summary.Completed, summary.SelectionMetric)
+	log.Printf(" win | train range | test range | selected params | train sharpe | test return | test sharpe | test mdd ")
+
+	for idx, window := range limitWalkForward(summary.Windows, top) {
+		selectedParams := "n/a"
+		trainSharpe := 0.0
+		testReturn := 0.0
+		testSharpe := 0.0
+		testMDD := 0.0
+
+		if window.Selected != nil {
+			selectedParams = formatSweepParams(window.Selected.Config, grid)
+			if window.Selected.Result != nil {
+				trainSharpe = window.Selected.Result.SharpeRatio
+			}
+		}
+
+		if window.OutOfSample != nil && window.OutOfSample.Result != nil {
+			testReturn = window.OutOfSample.Result.TotalReturn * 100
+			testSharpe = window.OutOfSample.Result.SharpeRatio
+			testMDD = window.OutOfSample.Result.MaxDrawdownPct * 100
+		}
+
+		log.Printf(
+			" %3d | %s..%s | %s..%s | %s | %11.2f | %10.2f%% | %11.2f | %8.2f%%",
+			idx+1,
+			window.Window.TrainStart.Format("2006-01-02"),
+			window.Window.TrainEnd.Format("2006-01-02"),
+			window.Window.TestStart.Format("2006-01-02"),
+			window.Window.TestEnd.Format("2006-01-02"),
+			selectedParams,
+			trainSharpe,
+			testReturn,
+			testSharpe,
+			testMDD,
+		)
+	}
+}
+
+func limitWalkForward(windows []optimize.WalkForwardResult, top int) []optimize.WalkForwardResult {
+	if top <= 0 || top >= len(windows) {
+		return windows
+	}
+	return windows[:top]
 }
