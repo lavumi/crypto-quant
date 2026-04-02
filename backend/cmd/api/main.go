@@ -181,9 +181,10 @@ EXAMPLES:
 	walletHandler := handler.NewWalletHandler(walletService)
 	portfolioHandler := handler.NewPortfolioHandler(portfolioService)
 	backtestHandler := handler.NewBacktestHandler(historyService)
+	experimentsHandler := handler.NewExperimentsHandler(db)
 
 	// Setup router
-	r := api.SetupRouter(marketHandler, dataHandler, walletHandler, portfolioHandler, backtestHandler)
+	r := api.SetupRouter(marketHandler, dataHandler, walletHandler, portfolioHandler, backtestHandler, experimentsHandler)
 
 	// Start server
 	log.Printf("API server starting on port %s", *port)

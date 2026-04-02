@@ -21,6 +21,7 @@ func SetupRouter(
 	walletHandler *handler.WalletHandler,
 	portfolioHandler *handler.PortfolioHandler,
 	backtestHandler *handler.BacktestHandler,
+	experimentsHandler *handler.ExperimentsHandler,
 ) *gin.Engine {
 	// Set Gin mode
 	gin.SetMode(gin.ReleaseMode)
@@ -96,6 +97,18 @@ func SetupRouter(
 		{
 			backtest.POST("/run", backtestHandler.RunBacktest)
 			backtest.GET("/strategies", backtestHandler.GetStrategies)
+		}
+	}
+
+	// API v2 routes
+	v2 := router.Group("/api/v2")
+	{
+		experiments := v2.Group("/experiments")
+		{
+			experiments.GET("", experimentsHandler.ListExperiments)
+			experiments.GET("/single/:id", experimentsHandler.GetSingle)
+			experiments.GET("/sweeps/:id", experimentsHandler.GetSweep)
+			experiments.GET("/walk-forward/:id", experimentsHandler.GetWalkForward)
 		}
 	}
 
