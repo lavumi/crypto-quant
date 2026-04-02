@@ -102,6 +102,18 @@
 			>
 		</a>
 
+		<a
+			href="/experiments"
+			class="bg-card rounded-xl p-6 shadow-md border transition-all hover:-translate-y-1 hover:shadow-lg relative group"
+		>
+			<h3 class="text-xl font-semibold text-primary mb-2">🧪 Experiments</h3>
+			<p class="text-muted-foreground">Browse stored single, sweep, and walk-forward research runs</p>
+			<span
+				class="absolute bottom-4 right-4 text-2xl text-primary opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all"
+				>→</span
+			>
+		</a>
+
 		<div class="bg-card rounded-xl p-6 shadow-md border opacity-60 cursor-not-allowed relative">
 			<h3 class="text-xl font-semibold text-primary mb-2">📈 Live Data</h3>
 			<p class="text-muted-foreground">Real-time cryptocurrency price monitoring</p>
@@ -131,4 +143,3 @@
 		</ol>
 	</div>
 </div>
-
