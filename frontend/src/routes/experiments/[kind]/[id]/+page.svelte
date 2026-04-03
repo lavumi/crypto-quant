@@ -112,6 +112,43 @@
 		].filter((item) => item.value);
 	}
 
+	function hasSingleCharts(payload: Record<string, any>) {
+		return Boolean(payload.equity_curve?.length);
+	}
+
+	function hasSweepCharts(payload: Record<string, any>) {
+		return Boolean(payload.results?.some((row: Record<string, unknown>) =>
+			asNumber(row.total_return) !== null ||
+			asNumber(row.sharpe_ratio) !== null ||
+			asNumber(row.max_drawdown_pct) !== null ||
+			asNumber(row.profit_factor) !== null
+		));
+	}
+
+	function hasWalkForwardPerformanceChart(payload: Record<string, any>) {
+		return Boolean(payload.windows?.some((row: Record<string, unknown>) =>
+			asNumber(row.test_return) !== null || asNumber(row.test_sharpe) !== null
+		));
+	}
+
+	function hasWalkForwardRiskChart(payload: Record<string, any>) {
+		return Boolean(payload.windows?.some((row: Record<string, unknown>) =>
+			asNumber(row.test_max_drawdown_pct) !== null
+		));
+	}
+
+	function hasPrimaryChart(kind: Kind, payload: Record<string, any>) {
+		if (kind === 'single') return hasSingleCharts(payload);
+		if (kind === 'sweeps') return hasSweepCharts(payload);
+		return hasWalkForwardPerformanceChart(payload);
+	}
+
+	function hasSecondaryChart(kind: Kind, payload: Record<string, any>) {
+		if (kind === 'single') return hasSingleCharts(payload);
+		if (kind === 'sweeps') return hasSweepCharts(payload);
+		return hasWalkForwardRiskChart(payload);
+	}
+
 	function setupPrimaryChart() {
 		if (!primaryChartContainer || !data) return;
 		const isDark = document.body.classList.contains('dark');
@@ -348,8 +385,14 @@
 	});
 
 	$effect(() => {
-		if (data) {
-			refreshCharts();
+		if (data && primaryChartContainer) {
+			setupPrimaryChart();
+		}
+	});
+
+	$effect(() => {
+		if (data && secondaryChartContainer) {
+			setupSecondaryChart();
 		}
 	});
 </script>
@@ -424,7 +467,15 @@
 									: 'window 별 out-of-sample 성과를 시계열로 확인합니다.'}
 						</p>
 					</div>
-					<div bind:this={primaryChartContainer} class="h-[360px] w-full rounded-2xl border bg-background"></div>
+					{#if hasPrimaryChart(page.params.kind as Kind, data)}
+						<div bind:this={primaryChartContainer} class="h-[360px] w-full rounded-2xl border bg-background"></div>
+					{:else}
+						<div class="flex h-[360px] w-full items-center justify-center rounded-2xl border border-dashed bg-background px-8 text-center text-sm text-muted-foreground">
+							{page.params.kind === 'walk-forward'
+								? '이 walk-forward run에는 표시할 out-of-sample 성과 데이터가 아직 없습니다.'
+								: '차트로 표시할 성과 데이터가 아직 없습니다.'}
+						</div>
+					{/if}
 				</Card>
 
 				<Card class="p-6">
@@ -438,7 +489,15 @@
 									: 'window 별 drawdown 패턴을 빠르게 점검합니다.'}
 						</p>
 					</div>
-					<div bind:this={secondaryChartContainer} class="h-[360px] w-full rounded-2xl border bg-background"></div>
+					{#if hasSecondaryChart(page.params.kind as Kind, data)}
+						<div bind:this={secondaryChartContainer} class="h-[360px] w-full rounded-2xl border bg-background"></div>
+					{:else}
+						<div class="flex h-[360px] w-full items-center justify-center rounded-2xl border border-dashed bg-background px-8 text-center text-sm text-muted-foreground">
+							{page.params.kind === 'walk-forward'
+								? '이 walk-forward run에는 표시할 drawdown 데이터가 아직 없습니다.'
+								: '차트로 표시할 리스크 데이터가 아직 없습니다.'}
+						</div>
+					{/if}
 				</Card>
 			</div>
 
