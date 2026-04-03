@@ -46,7 +46,7 @@ test:
 
 # Run server in production mode
 run:
-	@./server
+	@./server api
 
 # Run server in development mode (no build)
 dev:
@@ -54,7 +54,7 @@ dev:
 
 # Run with collector mode
 collect:
-	@./server --collect
+	@./server collect
 
 # Install dependencies
 deps:
@@ -93,9 +93,9 @@ help:
 	@echo "  make clean-all    - Remove all build artifacts"
 	@echo ""
 	@echo "Run:"
-	@echo "  make run          - Run server (./server)"
+	@echo "  make run          - Run server (./server api)"
 	@echo "  make dev          - Run in development mode (no build)"
-	@echo "  make collect      - Run in collector mode"
+	@echo "  make collect      - Run collector mode"
 	@echo ""
 	@echo "Development:"
 	@echo "  make deps         - Install dependencies"
@@ -104,8 +104,7 @@ help:
 	@echo "  make lint         - Lint code"
 	@echo ""
 	@echo "Usage examples:"
-	@echo "  ./server                                    # Start API server"
-	@echo "  ./server --help                             # Show all options"
-	@echo "  ./server --collect --symbol BTCUSDT --days 7  # Collect data"
-
+	@echo "  ./server api                               # Start API server"
+	@echo "  ./server help                              # Show all commands"
+	@echo "  ./server collect --symbol BTCUSDT --days 7 # Collect data"
 

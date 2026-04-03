@@ -138,11 +138,9 @@ cd backend
 ### Collecting Data
 
 ```bash
-cd backend
-
 # Collect historical data (required before backtesting)
-./bin/collector -symbol BTCUSDT -interval 1h -days 90
-./bin/collector -symbol BTCUSDT -interval 1d -days 365
+./server collect --symbol BTCUSDT --interval 1h --days 90 --db data/trading.db
+./server collect --symbol BTCUSDT --interval 1d --days 365 --db data/trading.db
 ```
 
 ### Running Backtest
@@ -150,21 +148,20 @@ cd backend
 #### CLI 사용
 
 ```bash
-cd backend
-
 # Run backtest with default settings
-./bin/backtest -symbol BTCUSDT -interval 1h
+./server backtest --symbol BTCUSDT --interval 1h --db data/trading.db
 
 # Run backtest with custom parameters
-./bin/backtest \
-  -symbol ETHUSDT \
-  -interval 4h \
-  -start 2025-07-01 \
-  -end 2025-10-17 \
-  -balance 10000 \
-  -commission 0.001 \
-  -fast 10 \
-  -slow 30
+./server backtest \
+  --symbol ETHUSDT \
+  --interval 4h \
+  --start 2025-07-01 \
+  --end 2025-10-17 \
+  --balance 10000 \
+  --commission 0.001 \
+  --fast 10 \
+  --slow 30 \
+  --db data/trading.db
 ```
 
 #### API 사용 (NEW!)

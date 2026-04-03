@@ -45,24 +45,25 @@ trading:
 ### 2. Build the Binary
 
 ```bash
-go build -o bin/backtest cmd/backtest/main.go
+make build
 ```
 
 ### 3. Run a Backtest
 
 ```bash
 # Simple backtest with defaults
-./bin/backtest
+./server backtest --db data/trading.db
 
 # Custom parameters
-./bin/backtest \
-  -symbol BTCUSDT \
-  -interval 1h \
-  -start 2024-01-01 \
-  -end 2024-10-01 \
-  -balance 10000 \
-  -fast 10 \
-  -slow 30
+./server backtest \
+  --symbol BTCUSDT \
+  --interval 1h \
+  --start 2024-01-01 \
+  --end 2024-10-01 \
+  --balance 10000 \
+  --fast 10 \
+  --slow 30 \
+  --db data/trading.db
 ```
 
 ## Understanding the Results
@@ -131,7 +132,7 @@ A simple trend-following strategy:
 
 **Example**:
 ```bash
-./bin/backtest -fast 10 -slow 30
+./server backtest --fast 10 --slow 30 --db data/trading.db
 ```
 
 **Common Combinations**:
@@ -290,10 +291,10 @@ signal := s.analyzeCurrentCandle(candle)
 ### For Faster Backtests
 ```bash
 # Use higher timeframes
-./bin/backtest -interval 4h  # faster than 1h
+./server backtest --interval 4h --db data/trading.db  # faster than 1h
 
 # Test shorter periods first
-./bin/backtest -start 2024-09-01 -end 2024-10-01
+./server backtest --start 2024-09-01 --end 2024-10-01 --db data/trading.db
 ```
 
 ### For Multiple Symbol Testing
@@ -301,7 +302,7 @@ signal := s.analyzeCurrentCandle(candle)
 # Create a simple bash script
 for symbol in BTCUSDT ETHUSDT BNBUSDT; do
     echo "Testing $symbol..."
-    ./bin/backtest -symbol $symbol
+    ./server backtest --symbol $symbol --db data/trading.db
 done
 ```
 
@@ -318,7 +319,6 @@ done
 - [Quantitative Trading by Ernest Chan](https://www.amazon.com/Quantitative-Trading-Build-Algorithmic-Business/dp/1119800064)
 - [Binance API Documentation](https://binance-docs.github.io/apidocs/spot/en/)
 - [Common Backtesting Pitfalls](https://www.quantstart.com/articles/Successful-Backtesting-of-Algorithmic-Trading-Strategies-Part-I/)
-
 
 
 

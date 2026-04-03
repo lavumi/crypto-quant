@@ -72,7 +72,7 @@ func (h *DataHandler) CollectHistoricalData(c *gin.Context) {
 			response.BadRequestResponse(c,
 				"Date range too large. API is limited to 90 days to prevent timeouts. "+
 					"For larger datasets, please use the CLI: "+
-					"./bin/collector -symbol "+symbol+" -interval "+interval+" -start "+startStr+" -end "+endStr)
+					"./server collect --symbol "+symbol+" --interval "+interval+" --start "+startStr+" --end "+endStr+" --db data/trading.db")
 			return
 		}
 	} else {
@@ -96,7 +96,7 @@ func (h *DataHandler) CollectHistoricalData(c *gin.Context) {
 			response.BadRequestResponse(c,
 				"Too many days requested. API is limited to 90 days to prevent timeouts. "+
 					"For larger datasets, please use the CLI: "+
-					"./bin/collector -symbol "+symbol+" -interval "+interval+" -days "+c.Query("days"))
+					"./server collect --symbol "+symbol+" --interval "+interval+" --days "+c.Query("days")+" --db data/trading.db")
 			return
 		}
 

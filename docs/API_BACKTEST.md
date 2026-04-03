@@ -466,7 +466,7 @@ API는 표준 HTTP 상태 코드와 에러 메시지를 반환합니다:
 
 1. **데이터 수집 먼저**: 백테스트를 실행하기 전에 먼저 collector로 데이터를 수집해야 합니다.
    ```bash
-   ./bin/collector -symbol BTCUSDT -interval 1h -days 90
+   ./server collect --symbol BTCUSDT --interval 1h --days 90 --db data/trading.db
    ```
 
 2. **처리 시간**: 많은 캔들 데이터로 백테스트할 경우 시간이 걸릴 수 있습니다.
@@ -495,7 +495,6 @@ http://localhost:8080/swagger/index.html
 - [전체 사용 가이드](./USAGE_GUIDE.md)
 - [백테스팅 상세 가이드](./BACKTEST.md)
 - [빠른 시작](../QUICKSTART.md)
-
 
 
 

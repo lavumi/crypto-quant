@@ -214,18 +214,17 @@ These commands are useful as a starting point for real experiments in the curren
 ### Collect Candle Data
 
 ```bash
-cd /Users/lavumi/private/crypto-quant/backend
+cd /Users/lavumi/private/crypto-quant
 
-./bin/collector -symbol BTCUSDT -interval 1h -days 365
+./server collect --symbol BTCUSDT --interval 1h --days 365 --db data/trading.db
 ```
 
 ### Run a Parameter Sweep
 
 ```bash
-cd /Users/lavumi/private/crypto-quant/backend
+cd /Users/lavumi/private/crypto-quant
 
-go run ./cmd/backtest \
-  --mode sweep \
+./server sweep \
   --strategy golden_rsi_bb \
   --symbol BTCUSDT \
   --interval 1h \
@@ -236,16 +235,16 @@ go run ./cmd/backtest \
   --param tp=0.04,0.06 \
   --param sl=0.02,0.03 \
   --sort sharpe \
-  --top 5
+  --top 5 \
+  --db data/trading.db
 ```
 
 ### Run a Walk-Forward Validation
 
 ```bash
-cd /Users/lavumi/private/crypto-quant/backend
+cd /Users/lavumi/private/crypto-quant
 
-go run ./cmd/backtest \
-  --mode walk-forward \
+./server walk-forward \
   --strategy golden_rsi_bb \
   --symbol BTCUSDT \
   --interval 1h \
@@ -259,7 +258,8 @@ go run ./cmd/backtest \
   --train-days 180 \
   --test-days 60 \
   --step-days 60 \
-  --top 5
+  --top 5 \
+  --db data/trading.db
 ```
 
 ### Notes

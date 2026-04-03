@@ -14,7 +14,7 @@
 ### 기본 사용법
 
 ```bash
-./bin/collector -symbol BTCUSDT -interval 1h -days 90
+./server collect --symbol BTCUSDT --interval 1h --days 90 --db data/trading.db
 ```
 
 ### 파라미터 설명
@@ -30,17 +30,17 @@
 
 ```bash
 # BTC 데이터 수집
-./bin/collector -symbol BTCUSDT -interval 1h -days 90   # 1시간봉 3개월
-./bin/collector -symbol BTCUSDT -interval 4h -days 180  # 4시간봉 6개월
-./bin/collector -symbol BTCUSDT -interval 1d -days 365  # 일봉 1년
+./server collect --symbol BTCUSDT --interval 1h --days 90 --db data/trading.db   # 1시간봉 3개월
+./server collect --symbol BTCUSDT --interval 4h --days 180 --db data/trading.db  # 4시간봉 6개월
+./server collect --symbol BTCUSDT --interval 1d --days 365 --db data/trading.db  # 일봉 1년
 
 # ETH 데이터 수집
-./bin/collector -symbol ETHUSDT -interval 1h -days 90
-./bin/collector -symbol ETHUSDT -interval 1d -days 365
+./server collect --symbol ETHUSDT --interval 1h --days 90 --db data/trading.db
+./server collect --symbol ETHUSDT --interval 1d --days 365 --db data/trading.db
 
 # BNB 데이터 수집
-./bin/collector -symbol BNBUSDT -interval 1h -days 90
-./bin/collector -symbol BNBUSDT -interval 1d -days 365
+./server collect --symbol BNBUSDT --interval 1h --days 90 --db data/trading.db
+./server collect --symbol BNBUSDT --interval 1d --days 365 --db data/trading.db
 ```
 
 ### 출력 예시
@@ -73,7 +73,7 @@ Historical data collection completed successfully!
 ### 기본 사용법
 
 ```bash
-./bin/backtest -symbol BTCUSDT -interval 1h -start 2024-07-01 -end 2024-10-17
+./server backtest --symbol BTCUSDT --interval 1h --start 2024-07-01 --end 2024-10-17 --db data/trading.db
 ```
 
 ### 파라미터 설명
@@ -94,43 +94,43 @@ Historical data collection completed successfully!
 #### 1. 기본 백테스트
 ```bash
 # 기본 설정으로 빠르게 테스트
-./bin/backtest
+./server backtest --db data/trading.db
 ```
 
 #### 2. 단기 트레이딩 전략
 ```bash
 # 빠른 이동평균으로 자주 거래
-./bin/backtest -symbol BTCUSDT -interval 1h -fast 5 -slow 15 -start 2024-08-01
+./server backtest --symbol BTCUSDT --interval 1h --fast 5 --slow 15 --start 2024-08-01 --db data/trading.db
 ```
 
 #### 3. 장기 투자 전략
 ```bash
 # 느린 이동평균으로 큰 추세 포착
-./bin/backtest -symbol BTCUSDT -interval 1d -fast 20 -slow 50 -start 2024-01-01
+./server backtest --symbol BTCUSDT --interval 1d --fast 20 --slow 50 --start 2024-01-01 --db data/trading.db
 ```
 
 #### 4. 골든 크로스 전략
 ```bash
 # 유명한 50/200 골든 크로스
-./bin/backtest -symbol BTCUSDT -interval 1d -fast 50 -slow 200 -start 2024-01-01
+./server backtest --symbol BTCUSDT --interval 1d --fast 50 --slow 200 --start 2024-01-01 --db data/trading.db
 ```
 
 #### 5. 알트코인 백테스트
 ```bash
 # ETH로 테스트
-./bin/backtest -symbol ETHUSDT -interval 4h -fast 10 -slow 30
+./server backtest --symbol ETHUSDT --interval 4h --fast 10 --slow 30 --db data/trading.db
 ```
 
 #### 6. 높은 수수료 환경 테스트
 ```bash
 # 현실적인 높은 수수료로 테스트
-./bin/backtest -commission 0.002 -balance 10000
+./server backtest --commission 0.002 --balance 10000 --db data/trading.db
 ```
 
 #### 7. 큰 자금으로 테스트
 ```bash
 # 10만 달러로 시뮬레이션
-./bin/backtest -balance 100000 -symbol BTCUSDT -interval 1d
+./server backtest --balance 100000 --symbol BTCUSDT --interval 1d --db data/trading.db
 ```
 
 ### 결과 해석
@@ -346,11 +346,11 @@ make deps
 make build
 
 # 3. 데이터 수집
-./bin/collector -symbol BTCUSDT -interval 1h -days 90
-./bin/collector -symbol BTCUSDT -interval 1d -days 365
+./server collect --symbol BTCUSDT --interval 1h --days 90 --db data/trading.db
+./server collect --symbol BTCUSDT --interval 1d --days 365 --db data/trading.db
 
 # 4. 백테스트 실행
-./bin/backtest -symbol BTCUSDT -interval 1h -start 2024-07-01
+./server backtest --symbol BTCUSDT --interval 1h --start 2024-07-01 --db data/trading.db
 
 # 5. 결과 분석 및 전략 조정
 ```
@@ -362,7 +362,7 @@ make build
 for fast in 5 10 15 20; do
   for slow in 20 30 40 50; do
     echo "Testing fast=$fast slow=$slow"
-    ./bin/backtest -fast $fast -slow $slow -symbol BTCUSDT -interval 1h
+    ./server backtest --fast $fast --slow $slow --symbol BTCUSDT --interval 1h --db data/trading.db
   done
 done
 ```
@@ -373,7 +373,7 @@ done
 # 스크립트로 자동화
 for symbol in BTCUSDT ETHUSDT BNBUSDT; do
   echo "=== Testing $symbol ==="
-  ./bin/backtest -symbol $symbol -interval 1d -start 2024-01-01
+  ./server backtest --symbol $symbol --interval 1d --start 2024-01-01 --db data/trading.db
 done
 ```
 
@@ -385,7 +385,7 @@ done
 
 **해결책**: 먼저 collector로 데이터 수집
 ```bash
-./bin/collector -symbol BTCUSDT -interval 1h -days 90
+./server collect --symbol BTCUSDT --interval 1h --days 90 --db data/trading.db
 ```
 
 ### 문제: API 에러 발생
@@ -393,7 +393,7 @@ done
 **해결책**: Binance API rate limit일 수 있음. 잠시 후 재시도
 ```bash
 # 10초 대기 후 재시도
-sleep 10 && ./bin/collector -symbol BTCUSDT -interval 1h -days 30
+sleep 10 && ./server collect --symbol BTCUSDT --interval 1h --days 30 --db data/trading.db
 ```
 
 ### 문제: 빌드 실패
@@ -425,15 +425,15 @@ killall api collector backtest
 1. **다양한 타임프레임 수집**
    ```bash
    # 같은 심볼의 여러 타임프레임
-   ./bin/collector -symbol BTCUSDT -interval 1h -days 90
-   ./bin/collector -symbol BTCUSDT -interval 4h -days 180
-   ./bin/collector -symbol BTCUSDT -interval 1d -days 365
+   ./server collect --symbol BTCUSDT --interval 1h --days 90 --db data/trading.db
+   ./server collect --symbol BTCUSDT --interval 4h --days 180 --db data/trading.db
+   ./server collect --symbol BTCUSDT --interval 1d --days 365 --db data/trading.db
    ```
 
 2. **정기적으로 데이터 업데이트**
    ```bash
    # cron job으로 매일 실행
-   0 0 * * * /path/to/bin/collector -symbol BTCUSDT -interval 1d -days 7
+   0 0 * * * /path/to/server collect --symbol BTCUSDT --interval 1d --days 7 --db /path/to/data/trading.db
    ```
 
 ### 💡 백테스트 팁
@@ -441,29 +441,29 @@ killall api collector backtest
 1. **아웃오브샘플 테스트**
    ```bash
    # 학습 기간
-   ./bin/backtest -start 2024-01-01 -end 2024-06-30 -fast 10 -slow 30
+   ./server backtest --start 2024-01-01 --end 2024-06-30 --fast 10 --slow 30 --db data/trading.db
    
    # 검증 기간 (파라미터 동일하게)
-   ./bin/backtest -start 2024-07-01 -end 2024-10-17 -fast 10 -slow 30
+   ./server backtest --start 2024-07-01 --end 2024-10-17 --fast 10 --slow 30 --db data/trading.db
    ```
 
 2. **현실적인 조건 설정**
    ```bash
    # 실제 거래 수수료 적용
-   ./bin/backtest -commission 0.001  # Binance 메이커 수수료
-   ./bin/backtest -commission 0.002  # 보수적 추정
+   ./server backtest --commission 0.001 --db data/trading.db  # Binance 메이커 수수료
+   ./server backtest --commission 0.002 --db data/trading.db  # 보수적 추정
    ```
 
 3. **여러 시장 상황 테스트**
    ```bash
    # 상승장
-   ./bin/backtest -start 2024-01-01 -end 2024-03-31
+   ./server backtest --start 2024-01-01 --end 2024-03-31 --db data/trading.db
    
    # 하락장
-   ./bin/backtest -start 2024-04-01 -end 2024-06-30
+   ./server backtest --start 2024-04-01 --end 2024-06-30 --db data/trading.db
    
    # 횡보장
-   ./bin/backtest -start 2024-07-01 -end 2024-09-30
+   ./server backtest --start 2024-07-01 --end 2024-09-30 --db data/trading.db
    ```
 
 ### 💡 성능 최적화
@@ -471,19 +471,19 @@ killall api collector backtest
 1. **큰 데이터셋은 높은 타임프레임 사용**
    ```bash
    # 빠름: 일봉 1년
-   ./bin/backtest -interval 1d -days 365
+   ./server backtest --interval 1d --db data/trading.db
    
    # 느림: 1분봉 1년
-   # ./bin/backtest -interval 1m -days 365  # 피하기
+   # ./server backtest --interval 1m --db data/trading.db  # 피하기
    ```
 
 2. **필요한 만큼만 데이터 수집**
    ```bash
    # 전략 개발: 짧은 기간
-   ./bin/collector -days 30
+   ./server collect --days 30 --db data/trading.db
    
    # 최종 검증: 긴 기간
-   ./bin/collector -days 365
+   ./server collect --days 365 --db data/trading.db
    ```
 
 ---
@@ -498,4 +498,3 @@ killall api collector backtest
 ---
 
 **마지막 업데이트**: 2024-10-17
-

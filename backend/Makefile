@@ -1,4 +1,4 @@
-.PHONY: build build-full build-frontend clean clean-frontend test run-api run-collector run-backtest help
+.PHONY: build build-full build-frontend clean clean-frontend test run-api run-collector run-backtest run-sweep run-walk-forward help
 
 # Build all binaries (without frontend)
 build: build-api build-collector build-backtest
@@ -51,23 +51,29 @@ test:
 
 # Run binaries
 run-api:
-	@./bin/api
+	@./bin/api api
 
 run-collector:
-	@./bin/collector
+	@./bin/api collect
 
 run-backtest:
-	@./bin/backtest
+	@./bin/api backtest
+
+run-sweep:
+	@./bin/api sweep
+
+run-walk-forward:
+	@./bin/api walk-forward
 
 # Development helpers
 dev-api:
 	@go run cmd/api/main.go
 
 dev-collector:
-	@go run cmd/collector/main.go
+	@go run cmd/api/main.go collect
 
 dev-backtest:
-	@go run cmd/backtest/main.go
+	@go run cmd/api/main.go backtest
 
 # Install dependencies
 deps:
@@ -100,7 +106,9 @@ help:
 	@echo "  test            - Run tests"
 	@echo "  run-api         - Run API server"
 	@echo "  run-collector   - Run data collector"
-	@echo "  run-backtest    - Run backtest"
+	@echo "  run-backtest    - Run single backtest"
+	@echo "  run-sweep       - Run parameter sweep"
+	@echo "  run-walk-forward - Run walk-forward validation"
 	@echo "  dev-api         - Run API in development mode"
 	@echo "  dev-collector   - Run collector in development mode"
 	@echo "  dev-backtest    - Run backtest in development mode"
@@ -108,7 +116,6 @@ help:
 	@echo "  fmt             - Format code"
 	@echo "  lint            - Lint code"
 	@echo "  help            - Show this help message"
-
 
 
 
